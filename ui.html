@@ -690,10 +690,16 @@ const BLOCK_COLORS = {
 const dropZone = document.getElementById('drop-zone');
 const fileInput = document.getElementById('file-input');
 
-dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('over'); });
-dropZone.addEventListener('dragleave', () => dropZone.classList.remove('over'));
+// Impede o browser de abrir arquivos arrastados em nova aba
+document.addEventListener('dragover', e => e.preventDefault());
+document.addEventListener('drop', e => e.preventDefault());
+
+dropZone.addEventListener('dragenter', e => { e.preventDefault(); e.stopPropagation(); dropZone.classList.add('over'); });
+dropZone.addEventListener('dragover', e => { e.preventDefault(); e.stopPropagation(); dropZone.classList.add('over'); });
+dropZone.addEventListener('dragleave', e => { e.stopPropagation(); dropZone.classList.remove('over'); });
 dropZone.addEventListener('drop', e => {
   e.preventDefault();
+  e.stopPropagation();
   dropZone.classList.remove('over');
   handleFiles(e.dataTransfer.files);
 });
