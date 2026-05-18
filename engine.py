@@ -13,7 +13,7 @@ from pathlib import Path
 BLOCK_ORDER = ['hook', 'story', 'revelacao', 'prova', 'cta']
 
 BLOCK_ALIASES = {
-    'hook':      ['hook', 'h1', 'h2', 'h3'],
+    'hook':      ['hook', 'he1', 'he2', 'he3', 'he4', 'he5', 'h1', 'h2', 'h3'],
     'story':     ['story', 'storia', 'estoria'],
     'revelacao': ['revelac', 'revelação', 'revelacao', 'rev'],
     'prova':     ['prova', 'proof', 'resultado'],
@@ -46,7 +46,7 @@ def classify_take(filename: str) -> dict:
         return {'block': 'unknown', 'variant': 1, 'part': 1, 'original_name': filename}
 
     # Extract variant number (H1, H2, H3, Cta_1, Cta_2...)
-    variant_match = re.search(r'(?:h|hook|cta|story|rev|prova)[\s_]?(\d)', stem_clean)
+    variant_match = re.search(r'(?:he|h|hook|cta|story|rev|prova)[\s_]?(\d)', stem_clean)
     variant = int(variant_match.group(1)) if variant_match else 1
 
     # Extract part number (pt1, pt2, part1...)
