@@ -15,9 +15,11 @@ os.makedirs(BASE_DIR, exist_ok=True)
 jobs = {}  # job_id -> job dict
 
 
+UI_HTML = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ui.html')).read() if os.path.exists(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ui.html')) else '<h1>ui.html not found</h1>'
+
 @app.route('/')
 def index():
-    return render_template_string(open('/home/claude/varvid/ui.html').read())
+    return UI_HTML
 
 
 @app.route('/analyze', methods=['POST'])
