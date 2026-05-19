@@ -1,8 +1,8 @@
 import os
 import uuid
 import threading
-import tempfile
 import shutil
+import json
 
 # Cria credenciais do Modal a partir das variáveis de ambiente
 _modal_token_id = os.environ.get('MODAL_TOKEN_ID', '')
@@ -29,11 +29,26 @@ def modal_fn(name):
 UI_HTML_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ui.html')
 UI_HTML = open(UI_HTML_PATH).read() if os.path.exists(UI_HTML_PATH) else '<h1>ui.html not found</h1>'
 
-jobs = {}
 BLOCK_ORDER = ['hook', 'story', 'revelacao', 'prova', 'cta']
 SWAPPABLE_BLOCKS = {'hook', 'story', 'cta'}
 UPLOAD_DIR = '/tmp/varvid_uploads'
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+
+def save_job(job_id, data):
+    """Salva metadados do job no disco."""
+    path = os.path.join(UPLOAD_DIR, job_id + '.json')
+    with open(path, 'w') as f:
+        json.dump(data, f)
+
+
+def load_job(job_id):
+    """Carrega metadados do job do disco."""
+    path = os.path.join(UPLOAD_DIR, job_id + '.json')
+    if not os.path.exists(path):
+        return None
+    with open(path) as f:
+        return json.load(f)
 
 
 @app.route('/')
@@ -76,12 +91,13 @@ def analyze():
         for opts in swappable_options:
             max_unique *= len(opts)
 
-        jobs[job_id] = {
+        job_data = {
             'status': 'ready',
             'job_dir': job_dir,
             'summary': summary,
             'max_combinations': max_unique,
         }
+        save_job(job_id, job_data)
 
         return jsonify({
             'job_id': job_id,
@@ -102,16 +118,20 @@ def generate():
     job_id = data.get('job_id')
     count = int(data.get('count', 10))
 
-    job = jobs.get(job_id)
+    job = load_job(job_id)
     if not job:
         return jsonify({'error': 'job not found'}), 404
 
     job_dir = job['job_dir']
-    jobs[job_id]['status'] = 'queued'
+    if not os.path.exists(job_dir):
+        return jsonify({'error': 'upload files not found, please re-upload'}), 404
+
+    job['status'] = 'queued'
+    save_job(job_id, job)
 
     def run_modal():
         try:
-            file_list = [f for f in os.listdir(job_dir) if not f.startswith('.')]
+            file_list = [f for f in os.listdir(job_dir) if not f.startswith('.') and not f.endswith('.json')]
             files_data = []
             for fname in file_list:
                 path = os.path.join(job_dir, fname)
@@ -122,8 +142,9 @@ def generate():
             modal_fn("process_job").remote(job_id, count)
             shutil.rmtree(job_dir, ignore_errors=True)
         except Exception as e:
-            jobs[job_id]['status'] = 'error'
-            jobs[job_id]['error'] = str(e)
+            job['status'] = 'error'
+            job['error'] = str(e)
+            save_job(job_id, job)
 
     t = threading.Thread(target=run_modal)
     t.daemon = True
