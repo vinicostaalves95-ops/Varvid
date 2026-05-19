@@ -2,6 +2,13 @@ import os
 import uuid
 import threading
 import shutil
+
+# Setup static ffmpeg if available
+try:
+    import static_ffmpeg
+    static_ffmpeg.add_paths()
+except ImportError:
+    pass
 from flask import Flask, request, jsonify, send_file, render_template_string
 from werkzeug.utils import secure_filename
 from engine import group_takes, summarize_groups, build_combinations, run_job, BLOCK_ORDER, SWAPPABLE_BLOCKS
@@ -15,10 +22,11 @@ os.makedirs(BASE_DIR, exist_ok=True)
 jobs = {}  # job_id -> job dict
 
 
+UI_HTML = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ui.html')).read() if os.path.exists(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ui.html')) else '<h1>ui.html not found</h1>'
+
 @app.route('/')
 def index():
-    ui_path = os.path.join(os.path.dirname(__file__), 'ui.html')
-    return render_template_string(open(ui_path).read())
+    return UI_HTML
 
 
 @app.route('/analyze', methods=['POST'])
