@@ -4,6 +4,14 @@ import threading
 import tempfile
 import shutil
 
+# Cria credenciais do Modal a partir das variáveis de ambiente
+_modal_token_id = os.environ.get('MODAL_TOKEN_ID', '')
+_modal_token_secret = os.environ.get('MODAL_TOKEN_SECRET', '')
+if _modal_token_id and _modal_token_secret:
+    os.makedirs(os.path.expanduser('~/.modal'), exist_ok=True)
+    with open(os.path.expanduser('~/.modal/credentials.toml'), 'w') as _f:
+        _f.write(f'[default]\ntoken_id = "{_modal_token_id}"\ntoken_secret = "{_modal_token_secret}"\n')
+
 from flask import Flask, request, jsonify, send_file
 from werkzeug.utils import secure_filename
 
