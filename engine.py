@@ -8,6 +8,13 @@ import shutil
 from itertools import product
 from pathlib import Path
 
+# Setup static ffmpeg
+try:
+    import static_ffmpeg
+    static_ffmpeg.add_paths()
+except ImportError:
+    pass
+
 # ─── BLOCK DEFINITIONS ────────────────────────────────────────────────────────
 
 BLOCK_ORDER = ['hook', 'story', 'revelacao', 'prova', 'cta']
@@ -238,9 +245,9 @@ def render_variation(groups: dict, combo: dict, output_path: str, tmp_base: str)
 
                 if vf_filters:
                     cmd += ['-vf', ','.join(vf_filters)]
-                    cmd += ['-c:v', 'libx264', '-preset', 'fast', '-crf', '22']
+                    cmd += ['-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '32']
                 else:
-                    cmd += ['-c:v', 'libx264', '-preset', 'fast', '-crf', '22']
+                    cmd += ['-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '32']
 
                 cmd += [
                     '-c:a', 'aac', '-ar', '44100', '-ac', '2',
@@ -265,10 +272,10 @@ def render_variation(groups: dict, combo: dict, output_path: str, tmp_base: str)
         cmd = [
             'ffmpeg', '-y',
             '-f', 'concat', '-safe', '0', '-i', concat_list,
-            '-c:v', 'libx264', '-preset', 'fast', '-crf', '22',
+            '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '32',
             '-c:a', 'aac', '-ar', '44100', '-ac', '2',
             '-pix_fmt', 'yuv420p',
-            '-movflags', '+faststart',
+            '-threads', '1', '-movflags', '+faststart',
             output_path
         ]
         result = subprocess.run(cmd, capture_output=True)
