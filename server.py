@@ -15,7 +15,7 @@ _modal_cache = {}
 def modal_fn(name):
     if name not in _modal_cache:
         import modal
-        _modal_cache[name] = modal.Function.lookup("varvid", name)
+        _modal_cache[name] = modal.Function.from_name("varvid", name)
     return _modal_cache[name]
 
 UI_HTML_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ui.html')
@@ -45,7 +45,6 @@ def analyze():
 
     saved_paths = []
     try:
-        # Salva no disco um por um (sem carregar tudo em RAM)
         for f in files:
             if f.filename:
                 fname = secure_filename(f.filename)
@@ -56,7 +55,6 @@ def analyze():
         if not saved_paths:
             return jsonify({'error': 'no valid files'}), 400
 
-        # Analisa estrutura localmente para a UI
         from engine import group_takes, summarize_groups
 
         groups = group_takes(saved_paths)
@@ -105,7 +103,6 @@ def generate():
 
     def run_modal():
         try:
-            # Envia arquivos ao Modal em chunks pequenos
             file_list = [f for f in os.listdir(job_dir) if not f.startswith('.')]
             files_data = []
             for fname in file_list:
@@ -115,8 +112,6 @@ def generate():
 
             modal_fn("save_takes").remote(job_id, files_data)
             modal_fn("process_job").remote(job_id, count)
-
-            # Limpa arquivos locais após envio
             shutil.rmtree(job_dir, ignore_errors=True)
         except Exception as e:
             jobs[job_id]['status'] = 'error'
