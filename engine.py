@@ -20,23 +20,18 @@ except ImportError:
 BLOCK_ORDER = ['hook', 'story', 'revelacao', 'prova', 'cta']
 
 BLOCK_ALIASES = {
-    'hook':      ['hook', 'he1', 'he2', 'he3', 'he4', 'he5', 'h1', 'h2', 'h3'],
-    'story':     ['story', 'storia', 'estoria'],
-    'revelacao': ['revelac', 'revelação', 'revelacao', 'rev'],
-    'prova':     ['prova', 'proof', 'resultado'],
-    'cta':       ['cta', 'call'],
+    'hook':     ['hook', 'he1', 'he2', 'he3', 'he4', 'he5', 'h1', 'h2', 'h3'],
+    'story':    ['story', 'storia', 'estoria'],
+    'revelacao':['revelac', 'revelação', 'revelacao', 'rev'],
+    'prova':    ['prova', 'proof', 'resultado'],
+    'cta':      ['cta', 'call'],
 }
 
-# Which blocks can be swapped between alternatives
 SWAPPABLE_BLOCKS = {'hook', 'story', 'cta'}
 
 # ─── TAKE PARSER ──────────────────────────────────────────────────────────────
 
 def classify_take(filename: str) -> dict:
-    """
-    Parse a filename like H1_pt1.MOV, Story_pt3.MOV, Cta_2.MOV, Revelacao_pt1.MOV
-    Returns: { block, variant, part, original_name }
-    """
     stem = Path(filename).stem.lower()
     stem_clean = stem.replace('_', ' ').replace('-', ' ')
 
@@ -52,56 +47,27 @@ def classify_take(filename: str) -> dict:
     if not block:
         return {'block': 'unknown', 'variant': 1, 'part': 1, 'original_name': filename}
 
-    # Extract variant number (H1, H2, H3, Cta_1, Cta_2...)
     variant_match = re.search(r'(?:he|h|hook|cta|story|rev|prova)[\s_]?(\d)', stem_clean)
     variant = int(variant_match.group(1)) if variant_match else 1
 
-    # Extract part number (pt1, pt2, part1...)
     part_match = re.search(r'pt[\s_]?(\d+)', stem_clean)
     part = int(part_match.group(1)) if part_match else 1
 
-    return {
-        'block': block,
-        'variant': variant,
-        'part': part,
-        'original_name': filename,
-    }
+    return {'block': block, 'variant': variant, 'part': part, 'original_name': filename}
 
 
 def group_takes(file_list: list) -> dict:
-    """
-    Groups files into blocks and variants.
-    Returns:
-    {
-      'hook': {
-        1: ['/path/H1_pt1.MOV', '/path/H1_pt2.MOV'],
-        2: ['/path/H2_pt1.MOV', '/path/H2_pt2.MOV'],
-        3: ['/path/H3_pt1.MOV', '/path/H3_pt2.MOV'],
-      },
-      'story': {
-        1: ['/path/Story_pt1.MOV', '/path/Story_pt2.MOV'],
-        ...
-      },
-      ...
-    }
-    """
     groups = {}
-
     for filepath in file_list:
         filename = os.path.basename(filepath)
         info = classify_take(filename)
-        b = info['block']
-        v = info['variant']
-        p = info['part']
-
+        b, v, p = info['block'], info['variant'], info['part']
         if b not in groups:
             groups[b] = {}
         if v not in groups[b]:
             groups[b][v] = []
-
         groups[b][v].append((p, filepath))
 
-    # Sort parts within each variant
     for block in groups:
         for variant in groups[block]:
             groups[block][variant].sort(key=lambda x: x[0])
@@ -123,7 +89,6 @@ def get_duration(filepath: str) -> float:
 
 
 def summarize_groups(groups: dict) -> dict:
-    """Build a summary dict for the UI"""
     summary = {}
     for block in BLOCK_ORDER:
         if block not in groups:
@@ -144,37 +109,25 @@ def summarize_groups(groups: dict) -> dict:
 # ─── COMBINATION ENGINE ───────────────────────────────────────────────────────
 
 def build_combinations(groups: dict, count: int, seed: int = 42) -> list:
-    """
-    Generate `count` unique video combinations.
-    Each combination = one variant chosen per swappable block + fixed blocks.
-    Returns list of combos: [{ block: variant_number, ... }]
-    """
     rng = random.Random(seed)
 
-    # Build pool of choices per swappable block
     choices = {}
     for block in BLOCK_ORDER:
         if block not in groups:
             continue
         variant_keys = sorted(groups[block].keys())
-        if block in SWAPPABLE_BLOCKS and len(variant_keys) > 1:
-            choices[block] = variant_keys
-        else:
-            choices[block] = variant_keys  # even fixed blocks need a choice (just 1 option)
+        choices[block] = variant_keys
 
-    # Generate all possible unique combos
     blocks_with_choices = [b for b in BLOCK_ORDER if b in choices]
     all_options = [choices[b] for b in blocks_with_choices]
-
     all_combos = list(product(*all_options))
     rng.shuffle(all_combos)
 
-    # If we need more than possible unique combos, allow repeats with different micro-seed
     result = []
     for i in range(count):
         combo_tuple = all_combos[i % len(all_combos)]
         combo = {blocks_with_choices[j]: combo_tuple[j] for j in range(len(blocks_with_choices))}
-        combo['_micro_seed'] = i  # for frame-level variation
+        combo['_micro_seed'] = i
         result.append(combo)
 
     return result
@@ -182,104 +135,178 @@ def build_combinations(groups: dict, count: int, seed: int = 42) -> list:
 
 # ─── FFMPEG RENDERER ──────────────────────────────────────────────────────────
 
+def _normalize_to_mp4(src: str, dst: str) -> bool:
+    """
+    Re-encode a single file to a standard H264/AAC MP4 with fixed resolution.
+    Used ONLY when the segment needs a zoom filter applied.
+    Uses ultrafast + low quality to minimize RAM.
+    """
+    cmd = [
+        'ffmpeg', '-y', '-i', src,
+        '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '35',
+        '-c:a', 'aac', '-ar', '44100', '-ac', '2',
+        '-pix_fmt', 'yuv420p',
+        '-threads', '1',
+        dst
+    ]
+    r = subprocess.run(cmd, capture_output=True)
+    return r.returncode == 0 and os.path.exists(dst)
+
+
+def _trim_and_copy(src: str, dst: str, trim_start: float, duration: float) -> bool:
+    """
+    Trim a segment using stream copy (no re-encode = very low RAM).
+    """
+    cmd = [
+        'ffmpeg', '-y',
+        '-ss', str(trim_start),
+        '-t', str(duration),
+        '-i', src,
+        '-c', 'copy',
+        '-avoid_negative_ts', 'make_zero',
+        dst
+    ]
+    r = subprocess.run(cmd, capture_output=True)
+    return r.returncode == 0 and os.path.exists(dst)
+
+
+def _trim_and_zoom(src: str, dst: str, trim_start: float, duration: float, zoom_factor: float) -> bool:
+    """
+    Trim + apply zoom crop, re-encode only this segment.
+    """
+    z = zoom_factor
+    # Assume 1080x1920 (portrait). Crop center then scale back.
+    w = int(1080 / z)
+    h = int(1920 / z)
+    x = int((1080 - w) / 2)
+    y = int((1920 - h) / 2)
+    vf = f'crop={w}:{h}:{x}:{y},scale=1080:1920:flags=bilinear'
+
+    cmd = [
+        'ffmpeg', '-y',
+        '-ss', str(trim_start),
+        '-t', str(duration),
+        '-i', src,
+        '-vf', vf,
+        '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '35',
+        '-c:a', 'aac', '-ar', '44100', '-ac', '2',
+        '-pix_fmt', 'yuv420p',
+        '-threads', '1',
+        '-avoid_negative_ts', 'make_zero',
+        dst
+    ]
+    r = subprocess.run(cmd, capture_output=True)
+    return r.returncode == 0 and os.path.exists(dst)
+
+
+def _concat_segments(seg_files: list, output_path: str) -> bool:
+    """
+    Concatenate segments using stream copy (no re-encode).
+    If files have mixed codecs/params this can fail — fallback to re-encode concat.
+    """
+    tmp_list = output_path + '.concat.txt'
+    with open(tmp_list, 'w') as f:
+        for sf in seg_files:
+            f.write(f"file '{sf}'\n")
+
+    # Try stream copy first (fast, low RAM)
+    cmd = [
+        'ffmpeg', '-y',
+        '-f', 'concat', '-safe', '0', '-i', tmp_list,
+        '-c', 'copy',
+        '-movflags', '+faststart',
+        output_path
+    ]
+    r = subprocess.run(cmd, capture_output=True)
+
+    if r.returncode != 0 or not os.path.exists(output_path):
+        # Fallback: re-encode concat (slower but safe for mixed inputs)
+        cmd2 = [
+            'ffmpeg', '-y',
+            '-f', 'concat', '-safe', '0', '-i', tmp_list,
+            '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '35',
+            '-c:a', 'aac', '-ar', '44100', '-ac', '2',
+            '-pix_fmt', 'yuv420p',
+            '-threads', '1',
+            '-movflags', '+faststart',
+            output_path
+        ]
+        r2 = subprocess.run(cmd2, capture_output=True)
+        os.remove(tmp_list)
+        return r2.returncode == 0 and os.path.exists(output_path)
+
+    os.remove(tmp_list)
+    return True
+
+
 def render_variation(groups: dict, combo: dict, output_path: str, tmp_base: str) -> bool:
-    """
-    Renders one video variation from a combination.
-    Applies micro-variations (zoom, frame trim) for fingerprint uniqueness.
-    """
     rng = random.Random(combo['_micro_seed'] * 9973 + 1337)
+
     tmp_dir = os.path.join(tmp_base, f'render_{uuid.uuid4().hex[:8]}')
     os.makedirs(tmp_dir, exist_ok=True)
 
     seg_files = []
 
     try:
+        seg_idx = 0
+        all_segs = []
         for block in BLOCK_ORDER:
             if block not in combo:
                 continue
             variant = combo[block]
             files = groups[block][variant]
-
             for part_idx, filepath in enumerate(files):
-                duration = get_duration(filepath)
-                if duration < 0.1:
-                    continue
+                all_segs.append((block, part_idx, filepath, len(files)))
 
-                seg_out = os.path.join(tmp_dir, f'{block}_{variant}_{part_idx:02d}.mp4')
+        total_segs = len(all_segs)
 
-                # Micro-variation decisions
-                # 1. Trim a few frames from start (except very first segment)
-                trim_start = 0.0
-                is_first_seg = (block == BLOCK_ORDER[0] and part_idx == 0)
-                if not is_first_seg:
-                    trim_frames = rng.randint(1, 6)
-                    trim_start = trim_frames / 30.0
+        for i, (block, part_idx, filepath, block_total) in enumerate(all_segs):
+            duration = get_duration(filepath)
+            if duration < 0.1:
+                continue
 
-                # 2. Trim a few frames from end
-                trim_end = duration
-                is_last_seg = (block == BLOCK_ORDER[-1] and part_idx == len(files) - 1)
-                if not is_last_seg:
-                    trim_frames_end = rng.randint(1, 3)
-                    trim_end = duration - (trim_frames_end / 30.0)
+            seg_out = os.path.join(tmp_dir, f'seg_{i:03d}.mp4')
 
-                if trim_end <= trim_start + 0.1:
-                    trim_end = trim_start + 0.1
+            is_first = (i == 0)
+            is_last = (i == total_segs - 1)
 
-                actual_duration = trim_end - trim_start
+            # Micro-trim decisions
+            trim_start = 0.0
+            if not is_first:
+                trim_frames = rng.randint(1, 5)
+                trim_start = trim_frames / 30.0
 
-                # 3. Zoom on some segments (not first, not last)
-                apply_zoom = (not is_first_seg and not is_last_seg and rng.random() < 0.3)
-                zoom_factor = rng.uniform(1.04, 1.10) if apply_zoom else 1.0
+            trim_end = duration
+            if not is_last:
+                trim_frames_end = rng.randint(1, 3)
+                trim_end = duration - (trim_frames_end / 30.0)
 
-                # Build ffmpeg command
-                cmd = ['ffmpeg', '-y', '-ss', str(trim_start), '-t', str(actual_duration), '-i', filepath]
+            if trim_end <= trim_start + 0.1:
+                trim_end = trim_start + 0.1
 
-                vf_filters = []
-                if zoom_factor > 1.0:
-                    z = zoom_factor
-                    w = int(1080 / z)
-                    h = int(1920 / z)
-                    x = int((1080 - w) / 2)
-                    y = int((1920 - h) / 2)
-                    vf_filters.append(f'crop={w}:{h}:{x}:{y},scale=1080:1920:flags=lanczos')
+            actual_duration = trim_end - trim_start
 
-                if vf_filters:
-                    cmd += ['-vf', ','.join(vf_filters)]
-                    cmd += ['-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '32']
-                else:
-                    cmd += ['-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '32']
+            # Zoom: only on middle segments, 25% chance
+            apply_zoom = (not is_first and not is_last and rng.random() < 0.25)
+            zoom_factor = rng.uniform(1.04, 1.08) if apply_zoom else 1.0
 
-                cmd += [
-                    '-c:a', 'aac', '-ar', '44100', '-ac', '2',
-                    '-avoid_negative_ts', 'make_zero',
-                    '-pix_fmt', 'yuv420p',
-                    seg_out
-                ]
+            if apply_zoom:
+                ok = _trim_and_zoom(filepath, seg_out, trim_start, actual_duration, zoom_factor)
+            else:
+                ok = _trim_and_copy(filepath, seg_out, trim_start, actual_duration)
 
-                r = subprocess.run(cmd, capture_output=True)
-                if r.returncode == 0 and os.path.exists(seg_out):
-                    seg_files.append(seg_out)
+            if ok:
+                seg_files.append(seg_out)
 
         if not seg_files:
             return False
 
-        # Concat all segments
-        concat_list = os.path.join(tmp_dir, 'concat.txt')
-        with open(concat_list, 'w') as f:
-            for sf in seg_files:
-                f.write(f"file '{sf}'\n")
+        if len(seg_files) == 1:
+            # Single segment — just move it
+            shutil.move(seg_files[0], output_path)
+            return os.path.exists(output_path)
 
-        cmd = [
-            'ffmpeg', '-y',
-            '-f', 'concat', '-safe', '0', '-i', concat_list,
-            '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '32',
-            '-c:a', 'aac', '-ar', '44100', '-ac', '2',
-            '-pix_fmt', 'yuv420p',
-            '-threads', '1', '-movflags', '+faststart',
-            output_path
-        ]
-        result = subprocess.run(cmd, capture_output=True)
-        return result.returncode == 0
+        return _concat_segments(seg_files, output_path)
 
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
@@ -288,7 +315,6 @@ def render_variation(groups: dict, combo: dict, output_path: str, tmp_base: str)
 # ─── HIGH-LEVEL JOB RUNNER ────────────────────────────────────────────────────
 
 def run_job(job: dict, file_list: list, count: int, output_dir: str):
-    """Main job runner — called in a thread"""
     try:
         job['status'] = 'analyzing'
         job['progress'] = 5
@@ -315,12 +341,12 @@ def run_job(job: dict, file_list: list, count: int, output_dir: str):
 
             if success:
                 output_files.append(out_path)
-                combo_desc = ' → '.join([
-                    f"{b.upper()}{'v'+str(combo[b]) if b in SWAPPABLE_BLOCKS else ''}"
-                    for b in BLOCK_ORDER if b in combo
-                ])
-                job['last_combo'] = combo_desc
 
+            combo_desc = ' → '.join([
+                f"{b.upper()}{'v'+str(combo[b]) if b in SWAPPABLE_BLOCKS else ''}"
+                for b in BLOCK_ORDER if b in combo
+            ])
+            job['last_combo'] = combo_desc
             job['completed'] = i + 1
             job['progress'] = 20 + int((i + 1) / count * 75)
 
