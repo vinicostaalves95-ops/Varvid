@@ -81,6 +81,17 @@ def analyze():
     })
 
 
+@app.route('/ffmpeg-check')
+def ffmpeg_check():
+    import subprocess
+    result = subprocess.run(['which', 'ffmpeg'], capture_output=True, text=True)
+    result2 = subprocess.run(['ffmpeg', '-version'], capture_output=True, text=True)
+    return jsonify({
+        'which': result.stdout.strip(),
+        'version': result2.stdout[:200] if result2.returncode == 0 else 'NOT FOUND',
+        'error': result2.stderr[:200] if result2.returncode != 0 else ''
+    })
+
 @app.route('/generate', methods=['POST'])
 def generate():
     data = request.json
