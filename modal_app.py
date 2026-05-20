@@ -129,8 +129,8 @@ def normalize_segment(src, dst, trim_start, duration, zoom_factor=1.0):
         '-i', src,
         '-vf', vf,
         '-c:v', 'libx264',
-        '-preset', 'fast',
-        '-crf', '23',
+        '-preset', 'medium',
+        '-crf', '18',
         '-profile:v', 'high',
         '-level', '4.0',
         '-colorspace', 'bt709',
@@ -221,7 +221,7 @@ def render_variation(groups, combo, output_path, tmp_dir):
     return concat_segments(seg_files, output_path)
 
 
-@app.function(timeout=600, memory=2048)
+@app.function(timeout=1800, memory=2048)
 def process_job_http(job_id: str, file_urls: list, output_base_url: str, count: int):
     """Baixa arquivos do Render via HTTP, processa, envia outputs de volta."""
     import requests
