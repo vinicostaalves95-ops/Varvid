@@ -188,12 +188,18 @@ def generate():
     job['count_requested'] = count
     save_job(job_id, job)
 
+    is_retry = data.get('retry', False)
+
     file_urls = [
         f"{RENDER_URL}/files/{job_id}/{fname}"
         for fname in os.listdir(takes_dir)
         if not fname.startswith('.')
     ]
     output_base_url = f"{RENDER_URL}/output/{job_id}"
+
+    # Em retry: passa só os índices que faltam
+    already_done = job.get('files', [])
+    missing_count = count - len(already_done)
 
     def run_modal():
         try:
@@ -222,12 +228,13 @@ def generate():
 @app.route('/status/<job_id>')
 def status(job_id):
     job = load_job(job_id)
-    if not job:
-        return jsonify({'status': 'not_found'})
 
+    # Mesmo sem job JSON, verifica arquivos no disco
     out_dir = os.path.join(job_dir(job_id), 'output')
     if os.path.exists(out_dir):
         done = sorted([f for f in os.listdir(out_dir) if f.endswith('.mp4')])
+        if job is None:
+            job = {'status': 'rendering', 'files': [], 'completed': 0, 'count_requested': len(done) or 5}
         job['files'] = done
         job['completed'] = len(done)
         count_req = job.get('count_requested', 5)
@@ -235,8 +242,13 @@ def status(job_id):
             job['status'] = 'done'
             job['progress'] = 100
         elif job.get('status') not in ('error', 'done'):
+            job['status'] = 'rendering'
             job['progress'] = max(5, int(len(done) / count_req * 95))
         save_job(job_id, job)
+        return jsonify(job)
+
+    if not job:
+        return jsonify({'status': 'not_found'})
 
     return jsonify(job)
 
