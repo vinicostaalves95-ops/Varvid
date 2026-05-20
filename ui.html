@@ -137,6 +137,7 @@ header {
 }
 .drop-loading.visible { display: flex; }
 @keyframes spin { to { transform: rotate(360deg); } }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 .spinner-ring {
   width: 14px; height: 14px;
   border: 2px solid #333;
@@ -689,6 +690,8 @@ header {
       </div>
       <div class="progress-combo" id="progress-combo">—</div>
       <div id="progress-eta" style="font-size:10px;color:#555;margin-top:4px;"></div>
+      <div style="font-size:10px;color:#444;margin-top:8px;font-style:italic;">✦ Estamos garantindo o máximo de qualidade no seu vídeo — por isso pode demorar um pouquinho.</div>
+      <div id="partial-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px;margin-top:12px;"></div>
     </div>
 
     <!-- Empty -->
@@ -901,6 +904,11 @@ async function pollStatus() {
     document.getElementById('progress-fill').style.width = pct + '%';
     document.getElementById('p-done').textContent = done;
 
+    // Renderiza cards parciais conforme chegam
+    if (data.files && data.files.length > 0) {
+      renderPartialCards(data.files);
+    }
+
     // ETA
     if (done > 0 && genStartTime) {
       const elapsed = (Date.now() - genStartTime) / 1000;
@@ -932,9 +940,33 @@ async function pollStatus() {
   } catch(e) {}
 }
 
+function renderPartialCards(files) {
+  const grid = document.getElementById('partial-grid');
+  const existing = grid.querySelectorAll('.result-card').length;
+  if (files.length <= existing) return;
+  const tagsHTML = BLOCK_ORDER.filter(b => jobSummary[b])
+    .map(b => `<span class="rtag rtag-${b}">${b.substring(0,3)}</span>`).join('');
+  files.slice(existing).forEach((fname, i) => {
+    const idx = existing + i;
+    const num = String(idx+1).padStart(2,'0');
+    const card = document.createElement('div');
+    card.className = 'result-card';
+    card.style.animation = 'fadeIn 0.3s ease';
+    card.innerHTML = `
+      <div class="result-top">
+        <div class="result-num">V${num}</div>
+        <div class="result-dot"></div>
+      </div>
+      <div class="result-tags">${tagsHTML}</div>
+      <a class="btn-dl" href="/download/${currentJobId}/${fname}" download="varvid_${num}.mp4">⬇ baixar</a>`;
+    grid.appendChild(card);
+  });
+}
+
 function showResults(data) {
   document.getElementById('progress-area').classList.remove('visible');
   document.getElementById('results-area').classList.add('visible');
+  document.getElementById('partial-grid').innerHTML = '';
   generatedFiles = data.files || [];
   const total = generatedFiles.length;
   document.getElementById('results-count').textContent = total + ' vídeo' + (total !== 1 ? 's' : '') + ' pronto' + (total !== 1 ? 's' : '');
