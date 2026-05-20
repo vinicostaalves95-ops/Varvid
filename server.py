@@ -51,15 +51,13 @@ def load_job(job_id):
         return json.load(f)
 
 
-def cleanup_old_jobs():
-    """Remove jobs com mais de 2 horas para liberar espaço."""
-    import time
-    now = time.time()
+def cleanup_all():
+    """Apaga tudo no disco — chamado antes de cada novo upload."""
     try:
         for entry in os.scandir(DATA_DIR):
-            if entry.is_dir() and (now - entry.stat().st_mtime) > 7200:
+            if entry.is_dir():
                 shutil.rmtree(entry.path, ignore_errors=True)
-            elif entry.name.endswith('.json') and (now - entry.stat().st_mtime) > 7200:
+            else:
                 os.remove(entry.path)
     except Exception:
         pass
@@ -86,7 +84,6 @@ def receive_output(job_id, filename):
     with open(path, 'wb') as f:
         f.write(request.data)
 
-    # Atualiza job com arquivo recebido
     job = load_job(job_id)
     if job:
         files = job.get('files', [])
@@ -102,7 +99,8 @@ def receive_output(job_id, filename):
 
 @app.route('/analyze', methods=['POST'])
 def analyze():
-    cleanup_old_jobs()
+    # Limpa tudo antes de cada novo job
+    cleanup_all()
 
     if 'files' not in request.files:
         return jsonify({'error': 'no files'}), 400
@@ -193,7 +191,8 @@ def generate():
     def run_modal():
         try:
             modal_fn("process_job_http").remote(job_id, file_urls, output_base_url, count)
-            # Marca como done quando Modal terminar
+            # Apaga takes após enviar URLs ao Modal — libera espaço
+            shutil.rmtree(takes_dir, ignore_errors=True)
             j = load_job(job_id)
             if j and j.get('status') != 'error':
                 j['status'] = 'done'
@@ -219,7 +218,6 @@ def status(job_id):
     if not job:
         return jsonify({'status': 'not_found'})
 
-    # Verifica arquivos prontos no disco
     out_dir = os.path.join(job_dir(job_id), 'output')
     if os.path.exists(out_dir):
         done = sorted([f for f in os.listdir(out_dir) if f.endswith('.mp4')])
@@ -241,7 +239,25 @@ def download(job_id, filename):
     path = os.path.join(job_dir(job_id), 'output', secure_filename(filename))
     if not os.path.exists(path):
         return 'not found', 404
-    return send_file(path, as_attachment=True, download_name=filename, mimetype='video/mp4')
+
+    # Serve o arquivo e apaga depois para liberar espaço
+    def send_and_delete():
+        try:
+            os.remove(path)
+            # Se pasta output ficou vazia, apaga o job inteiro
+            out_dir = os.path.join(job_dir(job_id), 'output')
+            if os.path.exists(out_dir) and not os.listdir(out_dir):
+                shutil.rmtree(job_dir(job_id), ignore_errors=True)
+                json_path = os.path.join(DATA_DIR, job_id + '.json')
+                if os.path.exists(json_path):
+                    os.remove(json_path)
+        except Exception:
+            pass
+
+    response = send_file(path, as_attachment=True, download_name=filename, mimetype='video/mp4')
+    # Apaga após resposta ser enviada
+    threading.Thread(target=send_and_delete).start()
+    return response
 
 
 if __name__ == '__main__':
