@@ -699,6 +699,9 @@ header {
       <div class="progress-combo" id="progress-combo">—</div>
       <div id="progress-eta" style="font-size:10px;color:#555;margin-top:4px;"></div>
       <div style="font-size:10px;color:#444;margin-top:8px;font-style:italic;">✦ Estamos garantindo o máximo de qualidade no seu vídeo — por isso pode demorar um pouquinho.</div>
+      <div id="progress-cold" style="display:none;font-size:10px;color:#555;margin-top:6px;padding:8px 10px;background:#0e0e0e;border:1px solid #1e1e1e;border-radius:6px;">
+        🔄 Inicializando o servidor de processamento — isso pode levar até 1 minuto na primeira vez. Aguarde, seu vídeo está sendo preparado.
+      </div>
       <div id="partial-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px;margin-top:12px;"></div>
     </div>
 
@@ -722,7 +725,12 @@ header {
     <div class="results-area" id="results-area">
       <div class="results-header">
         <div class="results-count" id="results-count">0 vídeos prontos</div>
-        <button class="btn-dl-all" onclick="downloadAll()">⬇ BAIXAR TODOS</button>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button id="btn-retry" onclick="retryMissing()" style="display:none;font-size:10px;color:#FB923C;background:transparent;border:1px solid #FB923C40;padding:5px 12px;border-radius:6px;cursor:pointer;font-family:Inter,sans-serif;transition:all 0.15s">
+            ↺ Regenerar faltantes
+          </button>
+          <button class="btn-dl-all" onclick="downloadAll()">⬇ BAIXAR TODOS</button>
+        </div>
       </div>
       <div class="results-grid" id="results-grid"></div>
     </div>
@@ -875,6 +883,12 @@ async function startGeneration() {
   document.getElementById('progress-fill').style.width = '0%';
   document.getElementById('progress-label').textContent = 'Inicializando...';
   genStartTime = Date.now();
+  setTimeout(() => {
+    const done = parseInt(document.getElementById('p-done').textContent) || 0;
+    if (done === 0) {
+      document.getElementById('progress-cold').style.display = 'block';
+    }
+  }, 60000);
 
   try {
     const res = await fetch('/generate', {
@@ -911,6 +925,7 @@ async function pollStatus() {
     const pct = Math.round((done / numVariations) * 100);
     document.getElementById('progress-fill').style.width = pct + '%';
     document.getElementById('p-done').textContent = done;
+    if (done > 0) document.getElementById('progress-cold').style.display = 'none';
 
     // Renderiza cards parciais conforme chegam
     if (data.files && data.files.length > 0) {
@@ -977,6 +992,13 @@ function showResults(data) {
   document.getElementById('partial-grid').innerHTML = '';
   generatedFiles = data.files || [];
   const total = generatedFiles.length;
+  const retryBtn = document.getElementById('btn-retry');
+  if (total < numVariations) {
+    retryBtn.style.display = 'block';
+    retryBtn.textContent = '↺ Regenerar faltantes (' + (numVariations - total) + ')';
+  } else {
+    retryBtn.style.display = 'none';
+  }
   document.getElementById('results-count').textContent = total + ' vídeo' + (total !== 1 ? 's' : '') + ' pronto' + (total !== 1 ? 's' : '');
   const grid = document.getElementById('results-grid');
   grid.innerHTML = '';
@@ -995,6 +1017,37 @@ function showResults(data) {
       <a class="btn-dl" href="/download/${currentJobId}/${fname}" download="varvid_${num}.mp4">⬇ baixar</a>`;
     grid.appendChild(card);
   });
+}
+
+async function retryMissing() {
+  if (!currentJobId) return;
+  const missing = numVariations - generatedFiles.length;
+  if (missing <= 0) return;
+
+  const btn = document.getElementById('btn-retry');
+  btn.textContent = 'Solicitando...';
+  btn.disabled = true;
+
+  try {
+    const res = await fetch('/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ job_id: currentJobId, count: numVariations, retry: true })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      document.getElementById('results-area').classList.remove('visible');
+      document.getElementById('progress-area').classList.add('visible');
+      document.getElementById('p-total').textContent = numVariations;
+      document.getElementById('p-done').textContent = generatedFiles.length;
+      document.getElementById('progress-label').textContent = 'Regenerando vídeos faltantes...';
+      genStartTime = Date.now();
+      pollInterval = setInterval(pollStatus, 2000);
+    }
+  } catch(e) {
+    btn.textContent = '↺ Regenerar faltantes';
+    btn.disabled = false;
+  }
 }
 
 async function clearDisk() {
