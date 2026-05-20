@@ -12,6 +12,7 @@ import modal
 from flask import Flask, request, jsonify, send_file, abort
 from werkzeug.utils import secure_filename
 
+
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024 * 1024  # 2GB
 
@@ -61,6 +62,12 @@ def cleanup_all():
                 os.remove(entry.path)
     except Exception:
         pass
+
+
+@app.route('/admin/clear', methods=['POST'])
+def admin_clear():
+    cleanup_all()
+    return jsonify({'ok': True, 'msg': 'Disco limpo com sucesso'})
 
 
 @app.route('/')
