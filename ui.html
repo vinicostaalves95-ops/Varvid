@@ -563,7 +563,15 @@ header {
     <span class="logo-name">VarVid</span>
     <span class="logo-ver">v2.0</span>
   </div>
-  <div class="header-tag">TikTok Shop · Anti-duplicate engine</div>
+  <div style="display:flex;align-items:center;gap:10px">
+    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px">
+      <button onclick="clearDisk()" id="btn-clear" style="font-size:10px;color:#444;background:transparent;border:1px solid #222;padding:3px 10px;border-radius:20px;cursor:pointer;font-family:Inter,sans-serif;transition:all 0.15s" onmouseover="this.style.borderColor='#E8FF47';this.style.color='#E8FF47'" onmouseout="this.style.borderColor='#222';this.style.color='#444'">
+        ⌫ Limpar disco
+      </button>
+      <span style="font-size:9px;color:#333;font-family:Inter,sans-serif">Clique após baixar todos os vídeos para liberar espaço</span>
+    </div>
+    <div class="header-tag">TikTok Shop · Anti-duplicate engine</div>
+  </div>
 </header>
 
 <div class="app">
@@ -987,6 +995,19 @@ function showResults(data) {
       <a class="btn-dl" href="/download/${currentJobId}/${fname}" download="varvid_${num}.mp4">⬇ baixar</a>`;
     grid.appendChild(card);
   });
+}
+
+async function clearDisk() {
+  const btn = document.getElementById('btn-clear');
+  btn.textContent = '...';
+  try {
+    const res = await fetch('/admin/clear', { method: 'POST' });
+    const data = await res.json();
+    btn.textContent = '✓ Limpo!';
+    setTimeout(() => { btn.textContent = '⌫ Limpar disco'; }, 2000);
+  } catch(e) {
+    btn.textContent = '⌫ Limpar disco';
+  }
 }
 
 function downloadAll() {
