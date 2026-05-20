@@ -26,7 +26,7 @@ UI_HTML_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ui.html
 UI_HTML = open(UI_HTML_PATH).read() if os.path.exists(UI_HTML_PATH) else '<h1>ui.html not found</h1>'
 
 BLOCK_ORDER = ['hook', 'story', 'revelacao', 'prova', 'cta']
-SWAPPABLE_BLOCKS = {'hook', 'story', 'cta'}
+SWAPPABLE_BLOCKS = {'hook', 'cta'}
 DATA_DIR = '/data/varvid'
 os.makedirs(DATA_DIR, exist_ok=True)
 
@@ -51,12 +51,25 @@ def load_job(job_id):
         return json.load(f)
 
 
+def cleanup_old_jobs():
+    """Remove jobs com mais de 2 horas para liberar espaço."""
+    import time
+    now = time.time()
+    try:
+        for entry in os.scandir(DATA_DIR):
+            if entry.is_dir() and (now - entry.stat().st_mtime) > 7200:
+                shutil.rmtree(entry.path, ignore_errors=True)
+            elif entry.name.endswith('.json') and (now - entry.stat().st_mtime) > 7200:
+                os.remove(entry.path)
+    except Exception:
+        pass
+
+
 @app.route('/')
 def index():
     return UI_HTML
 
 
-# ── Rota para o Modal buscar os arquivos de input ──────────────────────────
 @app.route('/files/<job_id>/<filename>')
 def serve_file(job_id, filename):
     path = os.path.join(job_dir(job_id), 'takes', secure_filename(filename))
@@ -65,18 +78,32 @@ def serve_file(job_id, filename):
     return send_file(path)
 
 
-# ── Rota para o Modal salvar os outputs ────────────────────────────────────
 @app.route('/output/<job_id>/<filename>', methods=['PUT'])
 def receive_output(job_id, filename):
     out_dir = os.path.join(job_dir(job_id), 'output')
     os.makedirs(out_dir, exist_ok=True)
     path = os.path.join(out_dir, secure_filename(filename))
-    request.stream_to_file(path) if hasattr(request, 'stream_to_file') else open(path, 'wb').write(request.data)
+    with open(path, 'wb') as f:
+        f.write(request.data)
+
+    # Atualiza job com arquivo recebido
+    job = load_job(job_id)
+    if job:
+        files = job.get('files', [])
+        if filename not in files:
+            files.append(filename)
+            files.sort()
+        job['files'] = files
+        job['completed'] = len(files)
+        save_job(job_id, job)
+
     return jsonify({'ok': True})
 
 
 @app.route('/analyze', methods=['POST'])
 def analyze():
+    cleanup_old_jobs()
+
     if 'files' not in request.files:
         return jsonify({'error': 'no files'}), 400
 
@@ -113,7 +140,8 @@ def analyze():
             'status': 'ready',
             'summary': summary,
             'max_combinations': max_unique,
-            'files': [os.path.basename(p) for p in saved_paths],
+            'files': [],
+            'completed': 0,
         }
         save_job(job_id, job_data)
 
@@ -134,7 +162,7 @@ def analyze():
 def generate():
     data = request.json
     job_id = data.get('job_id')
-    count = int(data.get('count', 10))
+    count = int(data.get('count', 5))
 
     job = load_job(job_id)
     if not job:
@@ -144,10 +172,17 @@ def generate():
     if not os.path.exists(takes_dir):
         return jsonify({'error': 'files not found, please re-upload'}), 404
 
+    # Limpa outputs anteriores deste job
+    out_dir = os.path.join(job_dir(job_id), 'output')
+    shutil.rmtree(out_dir, ignore_errors=True)
+    os.makedirs(out_dir, exist_ok=True)
+
     job['status'] = 'queued'
+    job['files'] = []
+    job['completed'] = 0
+    job['count_requested'] = count
     save_job(job_id, job)
 
-    # Monta lista de URLs para o Modal buscar
     file_urls = [
         f"{RENDER_URL}/files/{job_id}/{fname}"
         for fname in os.listdir(takes_dir)
@@ -158,10 +193,18 @@ def generate():
     def run_modal():
         try:
             modal_fn("process_job_http").remote(job_id, file_urls, output_base_url, count)
+            # Marca como done quando Modal terminar
+            j = load_job(job_id)
+            if j and j.get('status') != 'error':
+                j['status'] = 'done'
+                j['progress'] = 100
+                save_job(job_id, j)
         except Exception as e:
-            job['status'] = 'error'
-            job['error'] = str(e)
-            save_job(job_id, job)
+            j = load_job(job_id)
+            if j:
+                j['status'] = 'error'
+                j['error'] = str(e)
+                save_job(job_id, j)
 
     t = threading.Thread(target=run_modal)
     t.daemon = True
@@ -176,15 +219,18 @@ def status(job_id):
     if not job:
         return jsonify({'status': 'not_found'})
 
-    # Conta outputs prontos
+    # Verifica arquivos prontos no disco
     out_dir = os.path.join(job_dir(job_id), 'output')
     if os.path.exists(out_dir):
-        done = [f for f in os.listdir(out_dir) if f.endswith('.mp4')]
-        job['completed'] = len(done)
+        done = sorted([f for f in os.listdir(out_dir) if f.endswith('.mp4')])
         job['files'] = done
-        if len(done) >= job.get('count_requested', 1):
+        job['completed'] = len(done)
+        count_req = job.get('count_requested', 5)
+        if len(done) >= count_req:
             job['status'] = 'done'
             job['progress'] = 100
+        elif job.get('status') not in ('error', 'done'):
+            job['progress'] = max(5, int(len(done) / count_req * 95))
         save_job(job_id, job)
 
     return jsonify(job)
@@ -196,12 +242,6 @@ def download(job_id, filename):
     if not os.path.exists(path):
         return 'not found', 404
     return send_file(path, as_attachment=True, download_name=filename, mimetype='video/mp4')
-
-
-@app.route('/download/<job_id>/<int:idx>')
-def download_by_idx(job_id, idx):
-    filename = f'variation_{idx:02d}.mp4'
-    return download(job_id, filename)
 
 
 if __name__ == '__main__':
