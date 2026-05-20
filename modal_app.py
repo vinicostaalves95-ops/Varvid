@@ -6,23 +6,18 @@ import random
 import re
 import shutil
 import subprocess
+import urllib.request
 from pathlib import Path
 from itertools import product as iterproduct
 
-# ─── MODAL IMAGE ──────────────────────────────────────────────────────────────
 image = (
     modal.Image.debian_slim(python_version="3.11")
     .apt_install("ffmpeg")
-    .pip_install("flask", "werkzeug")
+    .pip_install("requests")
 )
 
 app = modal.App("varvid", image=image)
 
-# Volume para armazenar jobs temporários
-volume = modal.Volume.from_name("varvid-jobs", create_if_missing=True)
-JOBS_DIR = "/jobs"
-
-# ─── BLOCK DEFINITIONS ────────────────────────────────────────────────────────
 BLOCK_ORDER = ['hook', 'story', 'revelacao', 'prova', 'cta']
 BLOCK_ALIASES = {
     'hook':      ['hook', 'he1', 'he2', 'he3', 'he4', 'he5', 'h1', 'h2', 'h3'],
@@ -78,19 +73,14 @@ def get_duration(filepath):
         capture_output=True, text=True
     )
     try:
-        data = json.loads(result.stdout)
-        return float(data['format']['duration'])
+        return float(json.loads(result.stdout)['format']['duration'])
     except:
         return 0.0
 
 
 def build_combinations(groups, count, seed=42):
     rng = random.Random(seed)
-    choices = {}
-    for block in BLOCK_ORDER:
-        if block not in groups:
-            continue
-        choices[block] = sorted(groups[block].keys())
+    choices = {b: sorted(groups[b].keys()) for b in BLOCK_ORDER if b in groups}
     blocks = [b for b in BLOCK_ORDER if b in choices]
     all_combos = list(iterproduct(*[choices[b] for b in blocks]))
     rng.shuffle(all_combos)
@@ -112,12 +102,10 @@ def render_variation(groups, combo, output_path, tmp_dir):
     for block in BLOCK_ORDER:
         if block not in combo:
             continue
-        variant = combo[block]
-        files = groups[block][variant]
-        for part_idx, filepath in enumerate(files):
-            all_segs.append((block, part_idx, filepath, len(files)))
+        for part_idx, filepath in enumerate(groups[block][combo[block]]):
+            all_segs.append((block, part_idx, filepath))
 
-    for i, (block, part_idx, filepath, _) in enumerate(all_segs):
+    for i, (block, part_idx, filepath) in enumerate(all_segs):
         duration = get_duration(filepath)
         if duration < 0.1:
             continue
@@ -126,17 +114,12 @@ def render_variation(groups, combo, output_path, tmp_dir):
         is_first = (i == 0)
         is_last = (i == len(all_segs) - 1)
 
-        trim_start = 0.0
-        if not is_first:
-            trim_start = rng.randint(1, 5) / 30.0
-
-        trim_end = duration
-        if not is_last:
-            trim_end = duration - (rng.randint(1, 3) / 30.0)
+        trim_start = 0.0 if is_first else rng.randint(1, 5) / 30.0
+        trim_end = duration if is_last else duration - (rng.randint(1, 3) / 30.0)
         if trim_end <= trim_start + 0.1:
             trim_end = trim_start + 0.1
-
         actual_duration = trim_end - trim_start
+
         apply_zoom = (not is_first and not is_last and rng.random() < 0.25)
 
         if apply_zoom:
@@ -146,19 +129,13 @@ def render_variation(groups, combo, output_path, tmp_dir):
             x = int((1080 - w) / 2)
             y = int((1920 - h) / 2)
             vf = f'crop={w}:{h}:{x}:{y},scale=1080:1920:flags=bilinear'
-            cmd = [
-                'ffmpeg', '-y', '-ss', str(trim_start), '-t', str(actual_duration),
-                '-i', filepath, '-vf', vf,
-                '-c:v', 'libx264', '-preset', 'fast', '-crf', '28',
-                '-c:a', 'aac', '-ar', '44100', '-ac', '2',
-                '-pix_fmt', 'yuv420p', '-avoid_negative_ts', 'make_zero', seg_out
-            ]
+            cmd = ['ffmpeg', '-y', '-ss', str(trim_start), '-t', str(actual_duration),
+                   '-i', filepath, '-vf', vf, '-c:v', 'libx264', '-preset', 'fast',
+                   '-crf', '28', '-c:a', 'aac', '-ar', '44100', '-ac', '2',
+                   '-pix_fmt', 'yuv420p', '-avoid_negative_ts', 'make_zero', seg_out]
         else:
-            cmd = [
-                'ffmpeg', '-y', '-ss', str(trim_start), '-t', str(actual_duration),
-                '-i', filepath, '-c', 'copy',
-                '-avoid_negative_ts', 'make_zero', seg_out
-            ]
+            cmd = ['ffmpeg', '-y', '-ss', str(trim_start), '-t', str(actual_duration),
+                   '-i', filepath, '-c', 'copy', '-avoid_negative_ts', 'make_zero', seg_out]
 
         r = subprocess.run(cmd, capture_output=True)
         if r.returncode == 0 and os.path.exists(seg_out):
@@ -176,157 +153,70 @@ def render_variation(groups, combo, output_path, tmp_dir):
         for sf in seg_files:
             f.write(f"file '{sf}'\n")
 
-    cmd = [
-        'ffmpeg', '-y', '-f', 'concat', '-safe', '0', '-i', concat_list,
-        '-c', 'copy', '-movflags', '+faststart', output_path
-    ]
+    cmd = ['ffmpeg', '-y', '-f', 'concat', '-safe', '0', '-i', concat_list,
+           '-c', 'copy', '-movflags', '+faststart', output_path]
     r = subprocess.run(cmd, capture_output=True)
     if r.returncode != 0:
-        cmd2 = [
-            'ffmpeg', '-y', '-f', 'concat', '-safe', '0', '-i', concat_list,
-            '-c:v', 'libx264', '-preset', 'fast', '-crf', '28',
-            '-c:a', 'aac', '-ar', '44100', '-ac', '2',
-            '-pix_fmt', 'yuv420p', '-movflags', '+faststart', output_path
-        ]
+        cmd2 = ['ffmpeg', '-y', '-f', 'concat', '-safe', '0', '-i', concat_list,
+                '-c:v', 'libx264', '-preset', 'fast', '-crf', '28',
+                '-c:a', 'aac', '-ar', '44100', '-ac', '2',
+                '-pix_fmt', 'yuv420p', '-movflags', '+faststart', output_path]
         r = subprocess.run(cmd2, capture_output=True)
 
     return r.returncode == 0 and os.path.exists(output_path)
 
 
-# ─── MODAL FUNCTIONS ──────────────────────────────────────────────────────────
+@app.function(timeout=600, memory=2048)
+def process_job_http(job_id: str, file_urls: list, output_base_url: str, count: int):
+    """Baixa arquivos do Render via HTTP, processa, envia outputs de volta."""
+    import requests
 
-@app.function(
-    volumes={JOBS_DIR: volume},
-    timeout=600,
-    memory=2048,
-)
-def process_job(job_id: str, count: int):
-    """Processa as variações de vídeo. Roda no Modal com 2GB RAM."""
-    job_dir = os.path.join(JOBS_DIR, job_id)
-    takes_dir = os.path.join(job_dir, 'takes')
-    output_dir = os.path.join(job_dir, 'output')
-    status_file = os.path.join(job_dir, 'status.json')
+    tmp_base = f'/tmp/varvid_{job_id}'
+    takes_dir = os.path.join(tmp_base, 'takes')
+    output_dir = os.path.join(tmp_base, 'output')
+    os.makedirs(takes_dir, exist_ok=True)
     os.makedirs(output_dir, exist_ok=True)
 
-    def save_status(data):
-        with open(status_file, 'w') as f:
-            json.dump(data, f)
-        volume.commit()
-
     try:
-        save_status({'status': 'analyzing', 'progress': 5, 'completed': 0, 'total': count})
+        # Baixa cada arquivo do Render
+        file_list = []
+        for url in file_urls:
+            fname = url.split('/')[-1]
+            local_path = os.path.join(takes_dir, fname)
+            r = requests.get(url, timeout=60)
+            if r.status_code == 200:
+                with open(local_path, 'wb') as f:
+                    f.write(r.content)
+                file_list.append(local_path)
 
-        file_list = [
-            os.path.join(takes_dir, f)
-            for f in os.listdir(takes_dir)
-            if not f.startswith('.')
-        ]
+        if not file_list:
+            return {'error': 'no files downloaded'}
+
         groups = group_takes(file_list)
-
-        save_status({'status': 'planning', 'progress': 15, 'completed': 0, 'total': count})
-
         combos = build_combinations(groups, count)
 
         output_files = []
         for i, combo in enumerate(combos):
             out_path = os.path.join(output_dir, f'variation_{i+1:02d}.mp4')
-            tmp_dir = os.path.join(job_dir, f'tmp_{i}')
-
+            tmp_dir = os.path.join(tmp_base, f'tmp_{i}')
             success = render_variation(groups, combo, out_path, tmp_dir)
             shutil.rmtree(tmp_dir, ignore_errors=True)
 
-            if success:
-                output_files.append(f'variation_{i+1:02d}.mp4')
+            if success and os.path.exists(out_path):
+                # Envia output de volta ao Render via PUT
+                fname = f'variation_{i+1:02d}.mp4'
+                with open(out_path, 'rb') as f:
+                    resp = requests.put(
+                        f"{output_base_url}/{fname}",
+                        data=f.read(),
+                        headers={'Content-Type': 'video/mp4'},
+                        timeout=120
+                    )
+                if resp.status_code == 200:
+                    output_files.append(fname)
+                os.remove(out_path)
 
-            combo_desc = ' → '.join([
-                f"{b.upper()}{'v'+str(combo[b]) if b in SWAPPABLE_BLOCKS else ''}"
-                for b in BLOCK_ORDER if b in combo
-            ])
-            save_status({
-                'status': 'rendering',
-                'progress': 20 + int((i + 1) / count * 75),
-                'completed': i + 1,
-                'total': count,
-                'last_combo': combo_desc,
-            })
+        return {'status': 'done', 'files': output_files, 'count': len(output_files)}
 
-        save_status({
-            'status': 'done',
-            'progress': 100,
-            'completed': count,
-            'total': count,
-            'files': output_files,
-            'count': len(output_files),
-        })
-
-    except Exception as e:
-        import traceback
-        save_status({
-            'status': 'error',
-            'error': str(e),
-            'traceback': traceback.format_exc(),
-        })
-
-
-@app.function(
-    volumes={JOBS_DIR: volume},
-    timeout=120,
-    memory=512,
-)
-def save_takes(job_id: str, files_data: list):
-    """Salva os arquivos enviados no volume. files_data = [{name, data}]"""
-    takes_dir = os.path.join(JOBS_DIR, job_id, 'takes')
-    os.makedirs(takes_dir, exist_ok=True)
-
-    for file_info in files_data:
-        path = os.path.join(takes_dir, file_info['name'])
-        with open(path, 'wb') as f:
-            f.write(bytes(file_info['data']))
-
-    # Escreve status inicial
-    status_file = os.path.join(JOBS_DIR, job_id, 'status.json')
-    with open(status_file, 'w') as f:
-        json.dump({'status': 'ready'}, f)
-
-    volume.commit()
-    return {'ok': True, 'files': len(files_data)}
-
-
-@app.function(
-    volumes={JOBS_DIR: volume},
-    timeout=30,
-)
-def get_status(job_id: str):
-    """Lê o status atual do job."""
-    volume.reload()
-    status_file = os.path.join(JOBS_DIR, job_id, 'status.json')
-    if not os.path.exists(status_file):
-        return {'status': 'not_found'}
-    with open(status_file) as f:
-        return json.load(f)
-
-
-@app.function(
-    volumes={JOBS_DIR: volume},
-    timeout=30,
-)
-def get_video(job_id: str, filename: str):
-    """Retorna os bytes de um vídeo processado."""
-    volume.reload()
-    path = os.path.join(JOBS_DIR, job_id, 'output', filename)
-    if not os.path.exists(path):
-        return None
-    with open(path, 'rb') as f:
-        return f.read()
-
-
-@app.function(
-    volumes={JOBS_DIR: volume},
-    timeout=30,
-)
-def cleanup_job(job_id: str):
-    """Remove arquivos do job após download."""
-    job_dir = os.path.join(JOBS_DIR, job_id)
-    shutil.rmtree(job_dir, ignore_errors=True)
-    volume.commit()
-    return {'ok': True}
+    finally:
+        shutil.rmtree(tmp_base, ignore_errors=True)
