@@ -4,13 +4,12 @@ import threading
 import shutil
 import json
 
-# Credenciais Modal hardcoded para funcionar no Render
+# Credenciais Modal hardcoded
 os.environ.setdefault('MODAL_TOKEN_ID', 'ak-NoYwGctnzXxAYNDyxOmgxG')
 os.environ.setdefault('MODAL_TOKEN_SECRET', 'as-2Ni7YID6KeVHVSeEQelpLi')
 
 import modal
-
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify, send_file, abort
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
@@ -28,18 +27,24 @@ UI_HTML = open(UI_HTML_PATH).read() if os.path.exists(UI_HTML_PATH) else '<h1>ui
 
 BLOCK_ORDER = ['hook', 'story', 'revelacao', 'prova', 'cta']
 SWAPPABLE_BLOCKS = {'hook', 'story', 'cta'}
-UPLOAD_DIR = '/tmp/varvid_uploads'
-os.makedirs(UPLOAD_DIR, exist_ok=True)
+DATA_DIR = '/data/varvid'
+os.makedirs(DATA_DIR, exist_ok=True)
+
+RENDER_URL = 'https://varvid.onrender.com'
+
+
+def job_dir(job_id):
+    return os.path.join(DATA_DIR, job_id)
 
 
 def save_job(job_id, data):
-    path = os.path.join(UPLOAD_DIR, job_id + '.json')
+    path = os.path.join(DATA_DIR, job_id + '.json')
     with open(path, 'w') as f:
         json.dump(data, f)
 
 
 def load_job(job_id):
-    path = os.path.join(UPLOAD_DIR, job_id + '.json')
+    path = os.path.join(DATA_DIR, job_id + '.json')
     if not os.path.exists(path):
         return None
     with open(path) as f:
@@ -51,6 +56,25 @@ def index():
     return UI_HTML
 
 
+# ── Rota para o Modal buscar os arquivos de input ──────────────────────────
+@app.route('/files/<job_id>/<filename>')
+def serve_file(job_id, filename):
+    path = os.path.join(job_dir(job_id), 'takes', secure_filename(filename))
+    if not os.path.exists(path):
+        abort(404)
+    return send_file(path)
+
+
+# ── Rota para o Modal salvar os outputs ────────────────────────────────────
+@app.route('/output/<job_id>/<filename>', methods=['PUT'])
+def receive_output(job_id, filename):
+    out_dir = os.path.join(job_dir(job_id), 'output')
+    os.makedirs(out_dir, exist_ok=True)
+    path = os.path.join(out_dir, secure_filename(filename))
+    request.stream_to_file(path) if hasattr(request, 'stream_to_file') else open(path, 'wb').write(request.data)
+    return jsonify({'ok': True})
+
+
 @app.route('/analyze', methods=['POST'])
 def analyze():
     if 'files' not in request.files:
@@ -58,15 +82,15 @@ def analyze():
 
     files = request.files.getlist('files')
     job_id = uuid.uuid4().hex[:12]
-    job_dir = os.path.join(UPLOAD_DIR, job_id)
-    os.makedirs(job_dir, exist_ok=True)
+    takes_dir = os.path.join(job_dir(job_id), 'takes')
+    os.makedirs(takes_dir, exist_ok=True)
 
     saved_paths = []
     try:
         for f in files:
             if f.filename:
                 fname = secure_filename(f.filename)
-                path = os.path.join(job_dir, fname)
+                path = os.path.join(takes_dir, fname)
                 f.save(path)
                 saved_paths.append(path)
 
@@ -74,7 +98,6 @@ def analyze():
             return jsonify({'error': 'no valid files'}), 400
 
         from engine import group_takes, summarize_groups
-
         groups = group_takes(saved_paths)
         summary = summarize_groups(groups)
 
@@ -88,9 +111,9 @@ def analyze():
 
         job_data = {
             'status': 'ready',
-            'job_dir': job_dir,
             'summary': summary,
             'max_combinations': max_unique,
+            'files': [os.path.basename(p) for p in saved_paths],
         }
         save_job(job_id, job_data)
 
@@ -103,7 +126,7 @@ def analyze():
 
     except Exception as e:
         import traceback
-        shutil.rmtree(job_dir, ignore_errors=True)
+        shutil.rmtree(job_dir(job_id), ignore_errors=True)
         return jsonify({'error': str(e), 'trace': traceback.format_exc()}), 500
 
 
@@ -117,25 +140,24 @@ def generate():
     if not job:
         return jsonify({'error': 'job not found'}), 404
 
-    job_dir = job['job_dir']
-    if not os.path.exists(job_dir):
+    takes_dir = os.path.join(job_dir(job_id), 'takes')
+    if not os.path.exists(takes_dir):
         return jsonify({'error': 'files not found, please re-upload'}), 404
 
     job['status'] = 'queued'
     save_job(job_id, job)
 
+    # Monta lista de URLs para o Modal buscar
+    file_urls = [
+        f"{RENDER_URL}/files/{job_id}/{fname}"
+        for fname in os.listdir(takes_dir)
+        if not fname.startswith('.')
+    ]
+    output_base_url = f"{RENDER_URL}/output/{job_id}"
+
     def run_modal():
         try:
-            file_list = [f for f in os.listdir(job_dir) if not f.startswith('.')]
-            files_data = []
-            for fname in file_list:
-                path = os.path.join(job_dir, fname)
-                with open(path, 'rb') as f:
-                    files_data.append({'name': fname, 'data': list(f.read())})
-
-            modal_fn("save_takes").remote(job_id, files_data)
-            modal_fn("process_job").remote(job_id, count)
-            shutil.rmtree(job_dir, ignore_errors=True)
+            modal_fn("process_job_http").remote(job_id, file_urls, output_base_url, count)
         except Exception as e:
             job['status'] = 'error'
             job['error'] = str(e)
@@ -150,28 +172,30 @@ def generate():
 
 @app.route('/status/<job_id>')
 def status(job_id):
-    try:
-        result = modal_fn("get_status").remote(job_id)
-        return jsonify(result)
-    except Exception as e:
-        return jsonify({'error': str(e), 'status': 'error'}), 500
+    job = load_job(job_id)
+    if not job:
+        return jsonify({'status': 'not_found'})
+
+    # Conta outputs prontos
+    out_dir = os.path.join(job_dir(job_id), 'output')
+    if os.path.exists(out_dir):
+        done = [f for f in os.listdir(out_dir) if f.endswith('.mp4')]
+        job['completed'] = len(done)
+        job['files'] = done
+        if len(done) >= job.get('count_requested', 1):
+            job['status'] = 'done'
+            job['progress'] = 100
+        save_job(job_id, job)
+
+    return jsonify(job)
 
 
 @app.route('/download/<job_id>/<filename>')
 def download(job_id, filename):
-    try:
-        video_bytes = modal_fn("get_video").remote(job_id, filename)
-        if not video_bytes:
-            return 'not found', 404
-        import io
-        return send_file(
-            io.BytesIO(video_bytes),
-            as_attachment=True,
-            download_name=filename,
-            mimetype='video/mp4'
-        )
-    except Exception as e:
-        return str(e), 500
+    path = os.path.join(job_dir(job_id), 'output', secure_filename(filename))
+    if not os.path.exists(path):
+        return 'not found', 404
+    return send_file(path, as_attachment=True, download_name=filename, mimetype='video/mp4')
 
 
 @app.route('/download/<job_id>/<int:idx>')
