@@ -175,6 +175,18 @@ margin-top: auto;
 }
 .btn-generate:hover:not(:disabled) { background: #fff; transform: translateY(-1px); }
 .btn-generate:disabled { opacity: 0.25; cursor: not-allowed; transform: none; }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+.spinner {
+  display: inline-block;
+  width: 14px; height: 14px;
+  border: 2px solid rgba(0,0,0,0.3);
+  border-top-color: #000;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  vertical-align: middle;
+  margin-right: 0.5rem;
+}
 .panel-right { display: flex; flex-direction: column; overflow: hidden; }
 .blocks-area {
 padding: 1.5rem 2rem;
@@ -350,7 +362,7 @@ padding: 3rem;
 
     <div style="margin-top:auto">
       <button class="btn-generate" id="btn-generate" onclick="startGeneration()" disabled>
-        ▶ GERAR VARIAÇÕES
+        <span id="btn-spinner" style="display:none" class="spinner"></span><span id="btn-label">▶ GERAR VARIAÇÕES</span>
       </button>
     </div>
   </div>
@@ -464,6 +476,8 @@ function handleFiles(fileList) {
 // ── ANALYZE ──
 async function uploadAndAnalyze() {
   document.getElementById('btn-generate').disabled = true;
+  document.getElementById('btn-spinner').style.display = 'inline-block';
+  document.getElementById('btn-label').textContent = 'GERANDO...';
   const formData = new FormData();
   selectedFiles.forEach(f => formData.append('files', f, f.name));
   try {
@@ -474,6 +488,8 @@ async function uploadAndAnalyze() {
     jobSummary = data.summary || {};
     updateBlockUI(data.summary, data.max_combinations);
     document.getElementById('btn-generate').disabled = false;
+  document.getElementById('btn-spinner').style.display = 'none';
+  document.getElementById('btn-label').textContent = '▶ GERAR VARIAÇÕES';
     document.getElementById('empty-state').style.display = 'none';
   } catch(e) {
     alert('Erro ao analisar arquivos: ' + e.message);
@@ -516,6 +532,8 @@ function setVar(n) {
 async function startGeneration() {
   if (!currentJobId) return;
   document.getElementById('btn-generate').disabled = true;
+  document.getElementById('btn-spinner').style.display = 'inline-block';
+  document.getElementById('btn-label').textContent = 'GERANDO...';
   document.getElementById('results-area').classList.remove('visible');
   document.getElementById('empty-state').style.display = 'none';
   const progressArea = document.getElementById('progress-area');
@@ -537,6 +555,8 @@ async function startGeneration() {
   } catch(e) {
     alert('Erro: ' + e.message);
     document.getElementById('btn-generate').disabled = false;
+  document.getElementById('btn-spinner').style.display = 'none';
+  document.getElementById('btn-label').textContent = '▶ GERAR VARIAÇÕES';
   }
 }
 
@@ -575,6 +595,8 @@ async function pollStatus() {
       clearInterval(pollInterval);
       document.getElementById('progress-label').textContent = 'Erro: ' + (data.error || '');
       document.getElementById('btn-generate').disabled = false;
+  document.getElementById('btn-spinner').style.display = 'none';
+  document.getElementById('btn-label').textContent = '▶ GERAR VARIAÇÕES';
     }
   } catch(e) {}
 }
@@ -584,6 +606,8 @@ function showResults(data) {
   document.getElementById('progress-area').classList.remove('visible');
   document.getElementById('results-area').classList.add('visible');
   document.getElementById('btn-generate').disabled = false;
+  document.getElementById('btn-spinner').style.display = 'none';
+  document.getElementById('btn-label').textContent = '▶ GERAR VARIAÇÕES';
 
   // Usa a lista de arquivos retornada pelo servidor
   generatedFiles = data.files || [];
