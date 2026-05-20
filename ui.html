@@ -688,6 +688,7 @@ header {
         <div class="progress-fill" id="progress-fill"></div>
       </div>
       <div class="progress-combo" id="progress-combo">—</div>
+      <div id="progress-eta" style="font-size:10px;color:#555;margin-top:4px;"></div>
     </div>
 
     <!-- Empty -->
@@ -722,6 +723,7 @@ let selectedFiles = [];
 let numVariations = 5;
 let currentJobId = null;
 let pollInterval = null;
+let genStartTime = null;
 let generatedFiles = [];
 let jobSummary = {};
 
@@ -861,6 +863,7 @@ async function startGeneration() {
   document.getElementById('p-done').textContent = '0';
   document.getElementById('progress-fill').style.width = '0%';
   document.getElementById('progress-label').textContent = 'Inicializando...';
+  genStartTime = Date.now();
 
   try {
     const res = await fetch('/generate', {
@@ -897,11 +900,27 @@ async function pollStatus() {
     const pct = Math.round((done / numVariations) * 100);
     document.getElementById('progress-fill').style.width = pct + '%';
     document.getElementById('p-done').textContent = done;
+
+    // ETA
+    if (done > 0 && genStartTime) {
+      const elapsed = (Date.now() - genStartTime) / 1000;
+      const perVideo = elapsed / done;
+      const remaining = Math.round(perVideo * (numVariations - done));
+      const etaEl = document.getElementById('progress-eta');
+      if (remaining > 60) {
+        etaEl.textContent = '⏱ ~' + Math.round(remaining / 60) + ' min restantes';
+      } else if (remaining > 0) {
+        etaEl.textContent = '⏱ ~' + remaining + 's restantes';
+      } else {
+        etaEl.textContent = '';
+      }
+    }
     if (data.last_combo) {
       document.getElementById('progress-combo').textContent = '→ ' + data.last_combo;
     }
     if (data.status === 'done' || (data.files && data.files.length >= numVariations)) {
       clearInterval(pollInterval);
+      document.getElementById('progress-eta').textContent = '';
       showResults(data);
       resetBtn();
     }
