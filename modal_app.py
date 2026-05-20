@@ -246,15 +246,17 @@ def process_job_http(job_id: str, file_urls: list, output_base_url: str, count: 
                     if attempt > 0:
                         time.sleep(3 * attempt)
                         print(f"[RETRY] {fname} tentativa {attempt+1}")
-                    r = requests.get(url, timeout=120)
-                    if r.status_code == 200:
-                        with open(local_path, 'wb') as f:
-                            f.write(r.content)
-                        file_list.append(local_path)
-                        downloaded = True
-                        break
-                    else:
-                        print(f"[WARN] HTTP {r.status_code} para {fname}")
+                    with requests.get(url, timeout=120, stream=True) as r:
+                        if r.status_code == 200:
+                            with open(local_path, 'wb') as f:
+                                for chunk in r.iter_content(chunk_size=1024*1024):
+                                    if chunk:
+                                        f.write(chunk)
+                            file_list.append(local_path)
+                            downloaded = True
+                            break
+                        else:
+                            print(f"[WARN] HTTP {r.status_code} para {fname}")
                 except Exception as e:
                     print(f"[ERR] Download {fname}: {e}")
             if not downloaded:
