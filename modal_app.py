@@ -233,19 +233,32 @@ def process_job_http(job_id: str, file_urls: list, output_base_url: str, count: 
     os.makedirs(output_dir, exist_ok=True)
 
     try:
-        # Baixa cada arquivo do Render
+        # Baixa cada arquivo do Render com retry
+        import time
         file_list = []
         for url in file_urls:
             fname = url.split('/')[-1]
             local_path = os.path.join(takes_dir, fname)
             print(f"[DL] {fname}")
-            r = requests.get(url, timeout=120)
-            if r.status_code == 200:
-                with open(local_path, 'wb') as f:
-                    f.write(r.content)
-                file_list.append(local_path)
-            else:
-                print(f"[WARN] Falhou ao baixar {url}: {r.status_code}")
+            downloaded = False
+            for attempt in range(5):
+                try:
+                    if attempt > 0:
+                        time.sleep(3 * attempt)
+                        print(f"[RETRY] {fname} tentativa {attempt+1}")
+                    r = requests.get(url, timeout=120)
+                    if r.status_code == 200:
+                        with open(local_path, 'wb') as f:
+                            f.write(r.content)
+                        file_list.append(local_path)
+                        downloaded = True
+                        break
+                    else:
+                        print(f"[WARN] HTTP {r.status_code} para {fname}")
+                except Exception as e:
+                    print(f"[ERR] Download {fname}: {e}")
+            if not downloaded:
+                print(f"[SKIP] Falhou após 5 tentativas: {fname}")
 
         if not file_list:
             return {'error': 'no files downloaded'}
