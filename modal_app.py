@@ -370,7 +370,7 @@ def render_variation(groups, combo, output_path, tmp_dir,
     }
 
     # Pitch shift — único por vídeo: ±0.5 semitom máximo
-    pitch_shift = rng.uniform(-0.2, 0.2)
+    pitch_shift = rng.uniform(-0.14, 0.14)
 
     print(f"[COLOR] brightness={color_params['brightness']:.3f} "
           f"contrast={color_params['contrast']:.3f} "
