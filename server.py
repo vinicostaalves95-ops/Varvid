@@ -296,6 +296,9 @@ def download(job_id, filename):
 
     def send_and_delete():
         try:
+            # Espera 5 minutos antes de apagar — tempo suficiente para baixar todos
+            import time
+            time.sleep(300)
             os.remove(path)
             out_dir = os.path.join(job_dir(job_id), 'output')
             if os.path.exists(out_dir) and not os.listdir(out_dir):
