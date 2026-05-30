@@ -356,9 +356,23 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 
   <div class="mobile-scroll" id="mobile-scroll">
 
-    <!-- STEP 1 -->
+    <!-- NAMING -->
     <div class="mobile-section">
-      <div class="sec-label" data-step="1">Seus takes</div>
+      <div class="sec-label" data-step="1">Naming guide</div>
+      <div class="card">
+        <div class="naming-list">
+          <div class="naming-row"><span class="naming-file f-hook">H1_pt1.MOV</span><span class="naming-arrow">→</span><span class="naming-desc">Hook v1, pt 1</span></div>
+          <div class="naming-row"><span class="naming-file f-story">Story_pt2.MOV</span><span class="naming-arrow">→</span><span class="naming-desc">Story, pt 2</span></div>
+          <div class="naming-row"><span class="naming-file f-rev">Revelacao.MOV</span><span class="naming-arrow">→</span><span class="naming-desc">Revelação</span></div>
+          <div class="naming-row"><span class="naming-file f-prova">Prova.MOV</span><span class="naming-arrow">→</span><span class="naming-desc">Prova social</span></div>
+          <div class="naming-row"><span class="naming-file f-cta">Cta_2.MOV</span><span class="naming-arrow">→</span><span class="naming-desc">CTA variante 2</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 2 -->
+    <div class="mobile-section">
+      <div class="sec-label" data-step="2">Seus takes</div>
       <div class="drop-zone" id="drop-zone-m">
         <input type="file" id="file-input-m" multiple accept="video/*,.mov,.mp4,.MOV,.MP4">
         <div class="drop-icon">
@@ -373,7 +387,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 
     <!-- STEP 2 -->
     <div class="mobile-section">
-      <div class="sec-label" data-step="2">Quantas variações</div>
+      <div class="sec-label" data-step="3">Quantas variações</div>
       <div class="var-grid">
         <button class="var-btn active" onclick="setVar(5)">5</button>
         <button class="var-btn" onclick="setVar(10)">10</button>
@@ -386,7 +400,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 
     <!-- STEP 3 -->
     <div class="mobile-section">
-      <div class="sec-label" data-step="3">Headline no vídeo</div>
+      <div class="sec-label" data-step="4">Headline no vídeo</div>
       <div class="headline-row">
         <textarea id="headline-input" class="headline-textarea" placeholder="Texto do headline... (vazio = sem texto)" maxlength="80" oninput="updateCharCount()"></textarea>
         <div class="duration-block" id="duration-wrap-m">
@@ -472,19 +486,6 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
       </div>
     </div>
 
-    <!-- NAMING -->
-    <div class="mobile-section">
-      <div class="sec-label" style="margin-top:8px">Naming guide</div>
-      <div class="card">
-        <div class="naming-list">
-          <div class="naming-row"><span class="naming-file f-hook">H1_pt1.MOV</span><span class="naming-arrow">→</span><span class="naming-desc">Hook v1, pt 1</span></div>
-          <div class="naming-row"><span class="naming-file f-story">Story_pt2.MOV</span><span class="naming-arrow">→</span><span class="naming-desc">Story, pt 2</span></div>
-          <div class="naming-row"><span class="naming-file f-rev">Revelacao.MOV</span><span class="naming-arrow">→</span><span class="naming-desc">Revelação</span></div>
-          <div class="naming-row"><span class="naming-file f-prova">Prova.MOV</span><span class="naming-arrow">→</span><span class="naming-desc">Prova social</span></div>
-          <div class="naming-row"><span class="naming-file f-cta">Cta_2.MOV</span><span class="naming-arrow">→</span><span class="naming-desc">CTA variante 2</span></div>
-        </div>
-      </div>
-    </div>
 
   </div>
 
@@ -528,8 +529,20 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
       </div>
     </div>
 
+    <div class="naming-section">
+      <div class="naming-label sec-label" data-step="1">Naming guide</div>
+      <div class="naming-sub">Como nomear seus arquivos</div>
+      <div class="naming-list">
+        <div class="naming-row"><span class="naming-file f-hook">H1_pt1.MOV</span><span class="naming-arrow">→</span><span class="naming-desc">Hook v1, parte 1</span></div>
+        <div class="naming-row"><span class="naming-file f-story">Story_pt3.MOV</span><span class="naming-arrow">→</span><span class="naming-desc">Story, parte 3</span></div>
+        <div class="naming-row"><span class="naming-file f-rev">Revelacao_pt2.MOV</span><span class="naming-arrow">→</span><span class="naming-desc">Revelação, parte 2</span></div>
+        <div class="naming-row"><span class="naming-file f-prova">Prova.MOV</span><span class="naming-arrow">→</span><span class="naming-desc">Prova social</span></div>
+        <div class="naming-row"><span class="naming-file f-cta">Cta_2.MOV</span><span class="naming-arrow">→</span><span class="naming-desc">CTA, variante 2</span></div>
+      </div>
+    </div>
+
     <div class="panel-section">
-      <div class="sec-label" data-step="1">Seus takes</div>
+      <div class="sec-label" data-step="2">Seus takes</div>
       <div class="drop-zone" id="drop-zone-d">
         <input type="file" id="file-input-d" multiple accept="video/*,.mov,.mp4,.MOV,.MP4">
         <div class="drop-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#E8FF47" stroke-width="1.5" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>
@@ -541,7 +554,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
     </div>
 
     <div class="panel-section">
-      <div class="sec-label" data-step="2">Quantas variações</div>
+      <div class="sec-label" data-step="3">Quantas variações</div>
       <div class="var-grid">
         <button class="var-btn active" onclick="setVar(5)">5</button>
         <button class="var-btn" onclick="setVar(10)">10</button>
@@ -553,7 +566,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
     </div>
 
     <div class="panel-section">
-      <div class="sec-label" data-step="3">Headline no vídeo</div>
+      <div class="sec-label" data-step="4">Headline no vídeo</div>
       <div style="display:flex;gap:8px;height:96px">
         <div style="flex:1;background:#0e0e0e;border:1px solid #2a2a2a;border-radius:8px;display:flex;flex-direction:column;justify-content:space-between;padding:10px 12px;transition:border-color 0.2s;" id="textarea-wrap">
           <textarea id="headline-input-d" style="flex:1;resize:none;background:transparent;border:none;color:#fff;font-family:'Inter',sans-serif;font-size:12px;line-height:1.5;outline:none;" placeholder="Texto do headline... (vazio = sem texto)" maxlength="80" oninput="updateCharCountD()" onfocus="document.getElementById('textarea-wrap').style.borderColor='#E8FF47'" onblur="document.getElementById('textarea-wrap').style.borderColor='#2a2a2a'"></textarea>
@@ -567,18 +580,6 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
       </div>
       <div style="margin-top:6px">
         <span id="avg-tag-d" style="display:none;font-size:10px;color:#555;font-family:'Inter',monospace">⏱ média dos vídeos gerados: <span id="avg-duration-val-d" style="color:#888;font-weight:500">—</span>s</span>
-      </div>
-    </div>
-
-    <div class="naming-section">
-      <div class="naming-label sec-label" data-step="4">Naming guide</div>
-      <div class="naming-sub">Como nomear seus arquivos</div>
-      <div class="naming-list">
-        <div class="naming-row"><span class="naming-file f-hook">H1_pt1.MOV</span><span class="naming-arrow">→</span><span class="naming-desc">Hook v1, parte 1</span></div>
-        <div class="naming-row"><span class="naming-file f-story">Story_pt3.MOV</span><span class="naming-arrow">→</span><span class="naming-desc">Story, parte 3</span></div>
-        <div class="naming-row"><span class="naming-file f-rev">Revelacao_pt2.MOV</span><span class="naming-arrow">→</span><span class="naming-desc">Revelação, parte 2</span></div>
-        <div class="naming-row"><span class="naming-file f-prova">Prova.MOV</span><span class="naming-arrow">→</span><span class="naming-desc">Prova social</span></div>
-        <div class="naming-row"><span class="naming-file f-cta">Cta_2.MOV</span><span class="naming-arrow">→</span><span class="naming-desc">CTA, variante 2</span></div>
       </div>
     </div>
 
