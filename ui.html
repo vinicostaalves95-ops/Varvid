@@ -299,9 +299,11 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 .modal-footer { display: flex; justify-content: flex-end; }
 .btn-modal-start { padding: 10px 24px; background: #E8FF47; color: #000; border: none; border-radius: 10px; font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 800; cursor: pointer; }
 
-::-webkit-scrollbar { width: 4px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 2px; }
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: #111; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.25); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.45); }
+.desktop-left::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.3); }
 </style>
 </head>
 <body>
@@ -522,9 +524,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
       </div>
       <div id="clear-wrap-d" style="display:none;flex-direction:column;align-items:flex-end;gap:4px">
         <div style="display:flex;align-items:center;gap:6px">
-          <span style="font-size:10px;color:#E8FF47;font-family:Inter,sans-serif">Baixou tudo? Limpe para gerar novos</span>
-          <span style="color:#E8FF47;font-size:14px">→</span>
-          <button onclick="clearDisk()" id="btn-clear" style="font-size:11px;font-weight:600;color:#000;background:#E8FF47;border:none;padding:5px 14px;border-radius:20px;cursor:pointer;font-family:Inter,sans-serif;transition:opacity 0.2s" onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'">⌫ Limpar disco</button>
+          <button onclick="clearDisk()" id="btn-clear" style="font-size:11px;font-weight:600;color:#000;background:#E8FF47;border:none;padding:5px 14px;border-radius:20px;cursor:pointer;font-family:Inter,sans-serif;transition:opacity 0.2s;white-space:nowrap" onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'">⌫ Baixou? Limpe o disco →</button>
         </div>
       </div>
     </div>
@@ -823,6 +823,12 @@ async function startGeneration() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ job_id: currentJobId, count: numVariations, headline_text: headlineText, headline_duration: headlineDuration })
     });
+
+    if (res.status === 404) {
+      sessionExpired();
+      return;
+    }
+
     const data = await res.json();
     if (!data.ok) { alert('Erro ao iniciar'); resetBtn(); return; }
     pollInterval = setInterval(pollStatus, 2000);
@@ -851,6 +857,38 @@ function setProgressPct(p) {
 }
 function setProgressLabel(t) {
   ['progress-label-m','progress-label-d'].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = t; });
+}
+
+function sessionExpired() {
+  resetBtn();
+  // Esconde progress
+  ['progress-area-m','progress-area-d'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.remove('visible');
+  });
+  // Reseta estado
+  currentJobId = null;
+  selectedFiles = [];
+  generatedFiles = [];
+  takesMap = {};
+  // Reseta badges de arquivo
+  ['file-badge-m','file-badge-d'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = 'none';
+  });
+  // Mostra empty state
+  ['empty-state-m','empty-state-d'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = 'flex';
+  });
+  // Esconde matrix mobile
+  const ms = document.getElementById('matrix-section-m');
+  if (ms) ms.style.display = 'none';
+  setBothDisabled(true);
+  // Mostra alerta amigável
+  setTimeout(() => {
+    alert('⚠️ Sessão expirada — o servidor reiniciou e os arquivos foram perdidos.\n\nFaça o upload dos takes novamente para continuar.');
+  }, 100);
 }
 
 function resetBtn() {
