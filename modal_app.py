@@ -211,8 +211,13 @@ def build_headline_filter(text, style_seed, headline_duration, font_path=FONT_PA
 
 def build_zoom_filter(zoom_factor, face_center=None):
     z = zoom_factor
-    w = int(TARGET_W / z)
-    h = int(TARGET_H / z)
+    # Garante dimensões pares (necessário para H264)
+    w = int(TARGET_W / z) & ~1
+    h = int(TARGET_H / z) & ~1
+
+    # Garante que w e h são válidos
+    w = max(2, min(w, TARGET_W))
+    h = max(2, min(h, TARGET_H))
 
     if face_center:
         cx_px = int(face_center[0] * TARGET_W)
@@ -222,6 +227,10 @@ def build_zoom_filter(zoom_factor, face_center=None):
     else:
         x = (TARGET_W - w) // 2
         y = (TARGET_H - h) // 2
+
+    # Garante que x e y são pares
+    x = x & ~1
+    y = y & ~1
 
     return f'crop={w}:{h}:{x}:{y},scale={TARGET_W}:{TARGET_H}:flags=lanczos,format=yuv420p'
 
@@ -246,7 +255,7 @@ def normalize_segment(src, dst, trim_start, duration,
     else:
         vf_parts.append(
             f'scale={TARGET_W}:{TARGET_H}:'
-            f'force_original_aspect_ratio=decrease,'
+            f'force_original_aspect_ratio=decrease:flags=lanczos,'
             f'pad={TARGET_W}:{TARGET_H}:(ow-iw)/2:(oh-ih)/2:black,'
             f'format=yuv420p'
         )
@@ -300,8 +309,7 @@ def normalize_segment(src, dst, trim_start, duration,
         '-c:v', 'libx264',
         '-preset', 'ultrafast',
         '-crf', '23',
-        '-profile:v', 'high',
-        '-level', '4.0',
+        '-pix_fmt', 'yuv420p',
         '-c:a', 'aac',
         '-ar', '44100',
         '-ac', '2',
