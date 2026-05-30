@@ -359,18 +359,11 @@ def render_variation(groups, combo, output_path, tmp_dir,
             headline_duration=headline_duration
         )
 
-    # Parâmetros de cor — únicos por vídeo, aplicados em todos os segmentos
-    # Sutis: ±2% em cada canal
-    color_params = {
-        'brightness': rng.uniform(-0.02, 0.02),
-        'contrast':   rng.uniform(0.98, 1.02),
-        'saturation': rng.uniform(0.98, 1.02),
-        'r_gain':     rng.uniform(0.98, 1.02),
-        'b_gain':     rng.uniform(0.98, 1.02),
-    }
+    # Variação de cor removida — fingerprint via combinações de takes + zoom
+    color_params = None
 
     # Pitch shift — único por vídeo: ±0.5 semitom máximo
-    pitch_shift = rng.uniform(-0.05, 0.05)
+    pitch_shift = 0.0  # pitch shift removido
 
     print(f"[COLOR] brightness={color_params['brightness']:.3f} "
           f"contrast={color_params['contrast']:.3f} "
