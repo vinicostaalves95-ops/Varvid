@@ -62,7 +62,25 @@ header {
 .app { display: grid; grid-template-columns: 300px 1fr; flex: 1; min-height: 0; }
 .panel-left { border-right: 2px solid var(--border2); display: flex; flex-direction: column; overflow-y: auto; }
 .panel-section { padding: 16px; border-bottom: 1px solid var(--border); }
-.sec-label { font-size: 10px; color: var(--muted); letter-spacing: 0.12em; text-transform: uppercase; font-weight: 500; margin-bottom: 12px; }
+.sec-label {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 10px; color: #bbb;
+  letter-spacing: 0.14em; text-transform: uppercase;
+  font-weight: 600; margin-bottom: 14px;
+}
+.sec-label::before {
+  content: attr(data-step);
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; flex-shrink: 0;
+  border-radius: 50%;
+  border: 1.5px solid rgba(232,255,71,0.35);
+  background: rgba(232,255,71,0.06);
+  color: #E8FF47;
+  font-size: 10px; font-weight: 700;
+  font-family: 'Syne', sans-serif;
+  letter-spacing: 0;
+  box-shadow: 0 0 8px rgba(232,255,71,0.08);
+}
 .drop-zone { border: 1px dashed #444; border-radius: 10px; padding: 20px 14px; text-align: center; cursor: pointer; position: relative; background: var(--bg2); transition: border-color 0.2s; }
 .drop-zone:hover, .drop-zone.over { border-color: var(--accent); }
 .drop-zone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
@@ -122,7 +140,7 @@ header {
 
 /* ── NAMING ── */
 .naming-section { padding: 16px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
-.naming-label { font-size: 10px; color: var(--muted); letter-spacing: 0.12em; text-transform: uppercase; font-weight: 500; margin-bottom: 4px; }
+.naming-label { font-size: 10px; color: #bbb; letter-spacing: 0.14em; text-transform: uppercase; font-weight: 600; margin-bottom: 4px; }
 .naming-sub { font-size: 12px; color: #ddd; font-weight: 500; margin-bottom: 10px; }
 .naming-list { display: flex; flex-direction: column; gap: 5px; }
 .naming-row { display: flex; align-items: center; gap: 8px; }
@@ -283,7 +301,7 @@ header {
 <div class="app">
   <div class="panel-left">
     <div class="panel-section">
-      <div class="sec-label">01 — Seus takes</div>
+      <div class="sec-label" data-step="1">Seus takes</div>
       <div class="drop-zone" id="drop-zone">
         <input type="file" id="file-input" multiple accept="video/*,.mov,.mp4,.MOV,.MP4">
         <div class="drop-icon">
@@ -301,7 +319,7 @@ header {
     </div>
 
     <div class="panel-section">
-      <div class="sec-label">02 — Quantas variações</div>
+      <div class="sec-label" data-step="2">Quantas variações</div>
       <div class="var-grid">
         <button class="var-btn active" onclick="setVar(5)">5</button>
         <button class="var-btn" onclick="setVar(10)">10</button>
@@ -313,7 +331,7 @@ header {
     </div>
 
     <div class="panel-section">
-      <div class="sec-label">03 — Headline no vídeo</div>
+      <div class="sec-label" data-step="3">Headline no vídeo</div>
       <div style="display:flex;gap:8px;height:96px">
 
         <!-- Textarea block -->
@@ -353,7 +371,7 @@ header {
     </div>
 
     <div class="naming-section">
-      <div class="naming-label">04 — Naming guide</div>
+      <div class="naming-label sec-label" data-step="4">Naming guide</div>
       <div class="naming-sub">Como nomear seus arquivos</div>
       <div class="naming-list">
         <div class="naming-row"><span class="naming-file f-hook">H1_pt1.MOV</span><span class="naming-arrow">→</span><span class="naming-desc">Hook v1, parte 1</span></div>
