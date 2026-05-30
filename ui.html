@@ -1030,10 +1030,8 @@ function showResults(data) {
   const total = generatedFiles.length;
 
   ['progress-area-m','progress-area-d'].forEach(id => { const el = document.getElementById(id); if (el) el.classList.remove('visible'); });
-  const pListM = document.getElementById('partial-list-m');
-  const pGridD = document.getElementById('partial-grid-d');
-  if (pListM) pListM.innerHTML = '';
-  if (pGridD) pGridD.innerHTML = '';
+  document.getElementById('partial-list-m') && (document.getElementById('partial-list-m').innerHTML = '');
+  document.getElementById('partial-grid-d') && (document.getElementById('partial-grid-d').innerHTML = '');
 
   // Mobile results
   const raM = document.getElementById('results-area-m');
@@ -1042,8 +1040,6 @@ function showResults(data) {
   if (rcM) rcM.textContent = total + ' vídeo' + (total !== 1 ? 's' : '') + ' pronto' + (total !== 1 ? 's' : '');
   const retM = document.getElementById('btn-retry-m');
   if (retM) { retM.style.display = total < numVariations ? 'block' : 'none'; if (total < numVariations) retM.textContent = '↺ Regenerar (' + (numVariations-total) + ')'; }
-  const pListM = document.getElementById('partial-list-m');
-  if (pListM) pListM.innerHTML = '';
   const listM = document.getElementById('result-list-m');
   if (listM) { listM.innerHTML = ''; generatedFiles.forEach((fname, idx) => { const num = String(idx+1).padStart(2,'0'); const takesLine = buildTakesLine(fname); const item = document.createElement('div'); item.className = 'result-item'; item.innerHTML = `<div class="result-thumb"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4ADE80" stroke-width="1.5"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg></div><div class="result-info"><div class="result-num">V${num}</div><div class="result-takes">${takesLine || '—'}</div><div class="result-status">pronto</div></div><a class="btn-dl-item" href="/download/${currentJobId}/${fname}" download="varvid_${num}.mp4"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></a>`; listM.appendChild(item); }); }
 
@@ -1067,9 +1063,6 @@ function showResults(data) {
   if (retD) { retD.style.display = total < numVariations ? 'block' : 'none'; }
   const gridD = document.getElementById('results-grid-d');
   if (gridD) { gridD.innerHTML = ''; generatedFiles.forEach((fname, idx) => { const num = String(idx+1).padStart(2,'0'); const card = document.createElement('div'); card.className = 'result-card'; card.innerHTML = `<div class="result-top"><div class="result-num-d">V${num}</div><div class="result-dot"></div></div><div class="result-blocks">${buildCardBlocks(fname)}</div><a class="btn-dl-d" href="/download/${currentJobId}/${fname}" download="varvid_${num}.mp4">⬇ baixar</a>`; gridD.appendChild(card); }); }
-  // Limpar partial grid que pode ter botões desabilitados
-  const pGridD = document.getElementById('partial-grid-d');
-  if (pGridD) pGridD.innerHTML = '';
 
   // Acende botão de limpar
   const btnClearD = document.getElementById('btn-clear-results-d');
