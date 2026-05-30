@@ -504,26 +504,53 @@ def process_job_http(job_id: str, file_urls: list, output_base_url: str,
 
             if success and os.path.exists(out_path):
                 fname = f'variation_{i+1:02d}.mp4'
+
+                # Metadata com retry
                 meta = json.dumps(takes_used)
-                requests.put(
-                    f"{output_base_url}/meta/{fname}",
-                    data=meta.encode(),
-                    headers={'Content-Type': 'application/json'},
-                    timeout=30
-                )
+                for attempt in range(4):
+                    try:
+                        r = requests.put(
+                            f"{output_base_url}/meta/{fname}",
+                            data=meta.encode(),
+                            headers={'Content-Type': 'application/json'},
+                            timeout=30
+                        )
+                        if r.status_code == 200:
+                            break
+                    except Exception as e:
+                        print(f"[WARN] meta attempt {attempt+1}: {e}")
+                        time.sleep(2 * (attempt + 1))
+
+                # Upload do vídeo com retry robusto
                 with open(out_path, 'rb') as f:
-                    resp = requests.put(
-                        f"{output_base_url}/{fname}",
-                        data=f.read(),
-                        headers={'Content-Type': 'video/mp4'},
-                        timeout=180
-                    )
-                if resp.status_code == 200:
-                    output_files.append(fname)
-                    print(f"[OK] {fname}")
+                    video_data = f.read()
+                uploaded = False
+                for attempt in range(5):
+                    try:
+                        if attempt > 0:
+                            print(f"[RETRY] {fname} tentativa {attempt+1}")
+                            time.sleep(3 * attempt)
+                        resp = requests.put(
+                            f"{output_base_url}/{fname}",
+                            data=video_data,
+                            headers={'Content-Type': 'video/mp4'},
+                            timeout=300
+                        )
+                        if resp.status_code == 200:
+                            output_files.append(fname)
+                            print(f"[OK] {fname} ({len(video_data)//1024//1024}MB)")
+                            uploaded = True
+                            break
+                        else:
+                            print(f"[WARN] {fname} status {resp.status_code}")
+                    except Exception as e:
+                        print(f"[ERR] {fname} attempt {attempt+1}: {e}")
+
+                if not uploaded:
+                    print(f"[ERR] Falhou upload {fname} após 5 tentativas")
                 os.remove(out_path)
             else:
-                print(f"[ERR] Render falhou {i+1}")
+                print(f"[ERR] Render falhou render {i+1}")
 
         return {'status': 'done', 'files': output_files, 'count': len(output_files)}
 
