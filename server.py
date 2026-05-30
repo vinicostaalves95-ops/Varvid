@@ -238,18 +238,20 @@ def generate():
                 headline_text=headline_text,
                 headline_duration=headline_duration
             )
-            shutil.rmtree(takes_dir, ignore_errors=True)
             j = load_job(job_id)
             if j and j.get('status') != 'error':
                 j['status'] = 'done'
                 j['progress'] = 100
                 save_job(job_id, j)
+                # Só apaga takes após job concluído com sucesso
+                shutil.rmtree(takes_dir, ignore_errors=True)
         except Exception as e:
             j = load_job(job_id)
             if j:
                 j['status'] = 'error'
                 j['error'] = str(e)
                 save_job(job_id, j)
+            # Não apaga takes em caso de erro — permite retry
 
     t = threading.Thread(target=run_modal)
     t.daemon = True
