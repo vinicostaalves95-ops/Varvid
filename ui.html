@@ -86,7 +86,7 @@ header {
   border-right: 2px solid var(--border2);
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow-y: auto;
 }
 .panel-section {
   padding: 16px;
@@ -164,6 +164,18 @@ header {
 }
 .var-btn:hover { border-color: #555; color: #ccc; }
 .var-btn.active { background: var(--accent); border-color: var(--accent); color: #000; }
+
+/* ── HEADLINE ── */
+.headline-textarea {
+  width: 100%; min-height: 72px; resize: none;
+  background: #0e0e0e; border: 1px solid #2a2a2a;
+  border-radius: 8px; padding: 10px 12px;
+  color: #fff; font-family: 'Inter', sans-serif;
+  font-size: 12px; line-height: 1.5;
+  outline: none; transition: border-color 0.2s;
+}
+.headline-textarea:focus { border-color: var(--accent); }
+.headline-textarea::placeholder { color: #444; }
 
 /* ── NAMING ── */
 .naming-section {
@@ -561,7 +573,7 @@ header {
       </svg>
     </div>
     <span class="logo-name">VarVid</span>
-    <span class="logo-ver">v2.0</span>
+    <span class="logo-ver">v3.0</span>
   </div>
   <div style="display:flex;align-items:center;gap:10px">
     <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px">
@@ -612,8 +624,23 @@ header {
       </div>
     </div>
 
+    <div class="panel-section">
+      <div class="sec-label">03 — Headline no vídeo</div>
+      <textarea
+        id="headline-input"
+        class="headline-textarea"
+        placeholder="Ex: Isso mudou minha vida ‼️   (deixe vazio para sem texto)"
+        maxlength="80"
+        oninput="updateCharCount()"
+      ></textarea>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">
+        <span style="font-size:9px;color:#444;font-style:italic">Varia entre fundo preto/branco por vídeo</span>
+        <span id="char-count" style="font-size:9px;color:#555">0/80</span>
+      </div>
+    </div>
+
     <div class="naming-section">
-      <div class="naming-label">03 — Naming guide</div>
+      <div class="naming-label">04 — Naming guide</div>
       <div class="naming-sub">Como nomear seus arquivos</div>
       <div class="naming-list">
         <div class="naming-row">
@@ -654,7 +681,6 @@ header {
 
   <!-- RIGHT -->
   <div class="panel-right">
-    <!-- Matrix -->
     <div class="matrix-area" id="matrix-area">
       <div class="matrix-label">Estrutura detectada</div>
       <div class="mx-grid">
@@ -687,7 +713,6 @@ header {
       </div>
     </div>
 
-    <!-- Progress -->
     <div class="progress-area" id="progress-area">
       <div class="progress-top">
         <div class="progress-label" id="progress-label">Inicializando...</div>
@@ -705,7 +730,6 @@ header {
       <div id="partial-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px;margin-top:12px;"></div>
     </div>
 
-    <!-- Empty -->
     <div class="empty-state" id="empty-state">
       <div class="empty-icon">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#444" stroke-width="1.5">
@@ -716,12 +740,11 @@ header {
       <div class="empty-text">
         01 — nomeie seus takes corretamente<br>
         02 — arraste a pasta aqui<br>
-        03 — escolha quantas variações<br>
+        03 — escreva o headline (opcional)<br>
         04 — gera e baixa tudo pronto
       </div>
     </div>
 
-    <!-- Results -->
     <div class="results-area" id="results-area">
       <div class="results-header">
         <div class="results-count" id="results-count">0 vídeos prontos</div>
@@ -748,6 +771,11 @@ let jobSummary = {};
 
 const BLOCK_ORDER = ['hook','story','revelacao','prova','cta'];
 const SWAPPABLE = new Set(['hook','cta']);
+
+function updateCharCount() {
+  const val = document.getElementById('headline-input').value;
+  document.getElementById('char-count').textContent = val.length + '/80';
+}
 
 function closeModal() {
   document.getElementById('modal-overlay').classList.add('hidden');
@@ -871,6 +899,8 @@ function setVar(n) {
 
 async function startGeneration() {
   if (!currentJobId) return;
+  const headlineText = document.getElementById('headline-input').value.trim();
+
   document.getElementById('btn-generate').disabled = true;
   document.getElementById('btn-spinner').style.display = 'inline-block';
   document.getElementById('btn-label').textContent = 'GERANDO...';
@@ -894,7 +924,7 @@ async function startGeneration() {
     const res = await fetch('/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ job_id: currentJobId, count: numVariations })
+      body: JSON.stringify({ job_id: currentJobId, count: numVariations, headline_text: headlineText })
     });
     const data = await res.json();
     if (!data.ok) { alert('Erro ao iniciar geração'); resetBtn(); return; }
@@ -927,12 +957,10 @@ async function pollStatus() {
     document.getElementById('p-done').textContent = done;
     if (done > 0) document.getElementById('progress-cold').style.display = 'none';
 
-    // Renderiza cards parciais conforme chegam
     if (data.files && data.files.length > 0) {
       renderPartialCards(data.files);
     }
 
-    // ETA
     if (done > 0 && genStartTime) {
       const elapsed = (Date.now() - genStartTime) / 1000;
       const perVideo = elapsed / done;
@@ -1032,7 +1060,7 @@ async function retryMissing() {
     const res = await fetch('/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ job_id: currentJobId, count: numVariations, retry: true })
+      body: JSON.stringify({ job_id: currentJobId, count: numVariations, retry: true, headline_text: document.getElementById('headline-input').value.trim() })
     });
     const data = await res.json();
     if (data.ok) {
