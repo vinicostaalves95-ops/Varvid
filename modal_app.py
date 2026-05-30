@@ -12,9 +12,9 @@ from itertools import product as iterproduct
 image = (
     modal.Image.debian_slim(python_version="3.11")
     .apt_install("ffmpeg", "wget", "fontconfig", "libgl1", "libglib2.0-0")
-    .pip_install("requests", "mediapipe==0.10.9", "opencv-python-headless", "numpy")
+    .pip_install("requests", "numpy")
+    .pip_install("mediapipe==0.10.9", "opencv-python-headless")
     .run_commands(
-        "echo varvid-build-v7-mediapipe-fix",
         "mkdir -p /usr/share/fonts/poppins",
         "wget -q -O /usr/share/fonts/poppins/Poppins-ExtraBold.ttf "
         "'https://github.com/google/fonts/raw/main/ofl/poppins/Poppins-ExtraBold.ttf'",
