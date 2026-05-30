@@ -294,24 +294,8 @@ def download(job_id, filename):
     if not os.path.exists(path):
         return 'not found', 404
 
-    def send_and_delete():
-        try:
-            # Espera 5 minutos antes de apagar — tempo suficiente para baixar todos
-            import time
-            time.sleep(300)
-            os.remove(path)
-            out_dir = os.path.join(job_dir(job_id), 'output')
-            if os.path.exists(out_dir) and not os.listdir(out_dir):
-                shutil.rmtree(job_dir(job_id), ignore_errors=True)
-                json_path = os.path.join(DATA_DIR, job_id + '.json')
-                if os.path.exists(json_path):
-                    os.remove(json_path)
-        except Exception:
-            pass
-
-    response = send_file(path, as_attachment=True, download_name=filename, mimetype='video/mp4')
-    threading.Thread(target=send_and_delete).start()
-    return response
+    # Arquivos só são apagados via /admin/clear — sem auto-delete após download
+    return send_file(path, as_attachment=True, download_name=filename, mimetype='video/mp4')
 
 
 if __name__ == '__main__':
