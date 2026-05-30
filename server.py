@@ -4,7 +4,6 @@ import threading
 import shutil
 import json
 
-# Credenciais Modal hardcoded
 os.environ.setdefault('MODAL_TOKEN_ID', 'ak-NoYwGctnzXxAYNDyxOmgxG')
 os.environ.setdefault('MODAL_TOKEN_SECRET', 'as-2Ni7YID6KeVHVSeEQelpLi')
 
@@ -12,9 +11,8 @@ import modal
 from flask import Flask, request, jsonify, send_file, abort
 from werkzeug.utils import secure_filename
 
-
 app = Flask(__name__)
-app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024 * 1024  # 2GB
+app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024 * 1024
 
 _modal_cache = {}
 
@@ -53,7 +51,6 @@ def load_job(job_id):
 
 
 def cleanup_all():
-    """Apaga tudo no disco — chamado antes de cada novo upload."""
     try:
         for entry in os.scandir(DATA_DIR):
             if entry.is_dir():
@@ -106,7 +103,6 @@ def receive_output(job_id, filename):
 
 @app.route('/analyze', methods=['POST'])
 def analyze():
-    # Limpa tudo antes de cada novo job
     cleanup_all()
 
     if 'files' not in request.files:
@@ -168,6 +164,7 @@ def generate():
     data = request.json
     job_id = data.get('job_id')
     count = int(data.get('count', 5))
+    headline_text = data.get('headline_text', '').strip()
 
     job = load_job(job_id)
     if not job:
@@ -177,7 +174,6 @@ def generate():
     if not os.path.exists(takes_dir):
         return jsonify({'error': 'files not found, please re-upload'}), 404
 
-    # Limpa outputs anteriores deste job
     out_dir = os.path.join(job_dir(job_id), 'output')
     shutil.rmtree(out_dir, ignore_errors=True)
     os.makedirs(out_dir, exist_ok=True)
@@ -186,9 +182,8 @@ def generate():
     job['files'] = []
     job['completed'] = 0
     job['count_requested'] = count
+    job['headline_text'] = headline_text
     save_job(job_id, job)
-
-    is_retry = data.get('retry', False)
 
     file_urls = [
         f"{RENDER_URL}/files/{job_id}/{fname}"
@@ -197,14 +192,12 @@ def generate():
     ]
     output_base_url = f"{RENDER_URL}/output/{job_id}"
 
-    # Em retry: passa só os índices que faltam
-    already_done = job.get('files', [])
-    missing_count = count - len(already_done)
-
     def run_modal():
         try:
-            modal_fn("process_job_http").remote(job_id, file_urls, output_base_url, count)
-            # Apaga takes após enviar URLs ao Modal — libera espaço
+            modal_fn("process_job_http").remote(
+                job_id, file_urls, output_base_url, count,
+                headline_text=headline_text
+            )
             shutil.rmtree(takes_dir, ignore_errors=True)
             j = load_job(job_id)
             if j and j.get('status') != 'error':
@@ -229,7 +222,6 @@ def generate():
 def status(job_id):
     job = load_job(job_id)
 
-    # Mesmo sem job JSON, verifica arquivos no disco
     out_dir = os.path.join(job_dir(job_id), 'output')
     if os.path.exists(out_dir):
         done = sorted([f for f in os.listdir(out_dir) if f.endswith('.mp4')])
@@ -259,11 +251,9 @@ def download(job_id, filename):
     if not os.path.exists(path):
         return 'not found', 404
 
-    # Serve o arquivo e apaga depois para liberar espaço
     def send_and_delete():
         try:
             os.remove(path)
-            # Se pasta output ficou vazia, apaga o job inteiro
             out_dir = os.path.join(job_dir(job_id), 'output')
             if os.path.exists(out_dir) and not os.listdir(out_dir):
                 shutil.rmtree(job_dir(job_id), ignore_errors=True)
@@ -274,7 +264,6 @@ def download(job_id, filename):
             pass
 
     response = send_file(path, as_attachment=True, download_name=filename, mimetype='video/mp4')
-    # Apaga após resposta ser enviada
     threading.Thread(target=send_and_delete).start()
     return response
 
