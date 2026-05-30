@@ -348,7 +348,10 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
       <span class="logo-name">VarVid</span>
       <span class="logo-ver">v6.0</span>
     </div>
-    <button onclick="clearDisk()" style="font-size:10px;color:#444;background:transparent;border:1px solid #222;padding:4px 10px;border-radius:20px;cursor:pointer;font-family:Inter,sans-serif;">⌫ Limpar</button>
+    <div id="clear-wrap-m" style="display:none;align-items:center;gap:5px">
+      <span style="font-size:10px;color:#E8FF47">Baixou? →</span>
+      <button onclick="clearDisk()" style="font-size:10px;font-weight:600;color:#000;background:#E8FF47;border:none;padding:4px 12px;border-radius:20px;cursor:pointer;font-family:Inter,sans-serif;">⌫ Limpar</button>
+    </div>
   </div>
 
   <div class="mobile-scroll" id="mobile-scroll">
@@ -516,9 +519,12 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
         <div class="logo-icon"><svg viewBox="0 0 15 15" fill="none" width="15" height="15"><rect x="1" y="1" width="5.5" height="5.5" rx="1.5" fill="#000"/><rect x="8.5" y="1" width="5.5" height="5.5" rx="1.5" fill="#000" opacity=".6"/><rect x="1" y="8.5" width="5.5" height="5.5" rx="1.5" fill="#000" opacity=".6"/><rect x="8.5" y="8.5" width="5.5" height="5.5" rx="1.5" fill="#000" opacity=".25"/></svg></div>
         <span class="logo-name">VarVid</span><span class="logo-ver">v6.0</span>
       </div>
-      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px">
-        <button onclick="clearDisk()" id="btn-clear" style="font-size:10px;color:#444;background:transparent;border:1px solid #222;padding:3px 10px;border-radius:20px;cursor:pointer;font-family:Inter,sans-serif;" onmouseover="this.style.borderColor='#E8FF47';this.style.color='#E8FF47'" onmouseout="this.style.borderColor='#222';this.style.color='#444'">⌫ Limpar disco</button>
-        <span style="font-size:9px;color:#333;font-family:Inter,sans-serif">Clique após baixar todos</span>
+      <div id="clear-wrap-d" style="display:none;flex-direction:column;align-items:flex-end;gap:4px">
+        <div style="display:flex;align-items:center;gap:6px">
+          <span style="font-size:10px;color:#E8FF47;font-family:Inter,sans-serif">Baixou tudo? Limpe para gerar novos</span>
+          <span style="color:#E8FF47;font-size:14px">→</span>
+          <button onclick="clearDisk()" id="btn-clear" style="font-size:11px;font-weight:600;color:#000;background:#E8FF47;border:none;padding:5px 14px;border-radius:20px;cursor:pointer;font-family:Inter,sans-serif;transition:opacity 0.2s" onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'">⌫ Limpar disco</button>
+        </div>
       </div>
     </div>
 
@@ -978,6 +984,12 @@ function showResults(data) {
   const gridD = document.getElementById('results-grid-d');
   if (gridD) { gridD.innerHTML = ''; generatedFiles.forEach((fname, idx) => { const num = String(idx+1).padStart(2,'0'); const card = document.createElement('div'); card.className = 'result-card'; card.innerHTML = `<div class="result-top"><div class="result-num-d">V${num}</div><div class="result-dot"></div></div><div class="result-blocks">${buildCardBlocks(fname)}</div><a class="btn-dl-d" href="/download/${currentJobId}/${fname}" download="varvid_${num}.mp4">⬇ baixar</a>`; gridD.appendChild(card); }); }
 
+  // Acende botão de limpar
+  ['clear-wrap-d', 'clear-wrap-m'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = 'flex';
+  });
+
   // Switch mobile tab to results
   showTab('results');
 }
@@ -1014,7 +1026,37 @@ async function retryMissing() {
 }
 
 async function clearDisk() {
-  try { await fetch('/admin/clear', { method: 'POST' }); } catch(e) {}
+  try {
+    await fetch('/admin/clear', { method: 'POST' });
+    // Apaga estado local
+    currentJobId = null;
+    generatedFiles = [];
+    takesMap = {};
+    selectedFiles = [];
+    // Esconde botão de limpar
+    ['clear-wrap-d', 'clear-wrap-m'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = 'none';
+    });
+    // Reseta UI
+    ['results-area-m', 'results-area-d'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) { el.classList.remove('visible'); el.style.display = 'none'; }
+    });
+    ['empty-state-m', 'empty-state-d'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = 'flex';
+    });
+    ['file-badge-m', 'file-badge-d'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = 'none';
+    });
+    ['matrix-section-m'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = 'none';
+    });
+    setBothDisabled(true);
+  } catch(e) {}
 }
 
 function downloadAll() {
