@@ -648,8 +648,8 @@ let generatedFiles = [];
 let jobSummary = {};
 let takesMap = {};
 
-// Restaurar estado salvo
-(function restoreState() {
+// Restaurar estado salvo — roda após DOM pronto
+function restoreState() {
   const savedJobId = localStorage.getItem('varvid_job_id');
   const savedFiles = localStorage.getItem('varvid_files');
   if (savedJobId && savedFiles) {
@@ -658,27 +658,12 @@ let takesMap = {};
       if (files && files.length > 0) {
         currentJobId = savedJobId;
         generatedFiles = files;
-        // Mostrar resultados restaurados após DOM carregar
-        window.addEventListener('DOMContentLoaded', () => {
-          setTimeout(() => {
-            showResults({ files: files, takes_map: {} });
-            // Aviso de restauração
-            ['results-area-m','results-area-d'].forEach(id => {
-              const el = document.getElementById(id);
-              if (el && !el.querySelector('.restore-warn')) {
-                const w = document.createElement('div');
-                w.className = 'restore-warn';
-                w.style.cssText = 'font-size:10px;color:#60A5FA;background:rgba(96,165,250,0.08);border:1px solid rgba(96,165,250,0.2);border-radius:8px;padding:7px 10px;margin-bottom:10px';
-                w.textContent = '↩ Sessão restaurada — seus vídeos ainda estão disponíveis para download.';
-                el.insertBefore(w, el.firstChild);
-              }
-            });
-          }, 300);
-        });
+        showResults({ files: files, takes_map: {} });
       }
     } catch(e) {}
   }
-})();
+}
+window.addEventListener('load', restoreState);
 
 const BLOCK_ORDER = ['hook','story','revelacao','prova','cta'];
 const SWAPPABLE = new Set(['hook','cta']);
@@ -1045,7 +1030,7 @@ function showResults(data) {
 
   // Desktop results
   const raD = document.getElementById('results-area-d');
-  if (raD) raD.classList.add('visible');
+  if (raD) { raD.style.display = 'block'; raD.classList.add('visible'); }
   const rcD = document.getElementById('results-count-d');
   if (rcD) rcD.textContent = total + ' vídeo' + (total !== 1 ? 's' : '') + ' pronto' + (total !== 1 ? 's' : '');
   // Aviso de tempo
