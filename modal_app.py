@@ -14,7 +14,6 @@ image = (
     .apt_install("ffmpeg", "wget", "fontconfig")
     .pip_install("requests")
     .run_commands(
-        # Instala Poppins ExtraBold do Google Fonts
         "mkdir -p /usr/share/fonts/poppins",
         "wget -q -O /usr/share/fonts/poppins/Poppins-ExtraBold.ttf "
         "'https://github.com/google/fonts/raw/main/ofl/poppins/Poppins-ExtraBold.ttf'",
@@ -36,11 +35,10 @@ SWAPPABLE_BLOCKS = {'hook', 'cta'}
 
 TARGET_W = 1080
 TARGET_H = 1920
-
 FONT_PATH = '/usr/share/fonts/poppins/Poppins-ExtraBold.ttf'
 
-# Zona segura TikTok: topo começa em ~15% da altura (288px em 1920)
-TEXT_Y_TOP = 210   # px do topo onde o bloco de texto é posicionado
+# Zona segura TikTok: abaixo da barra de status (~13% do topo)
+TEXT_Y_TOP = 260
 
 
 def classify_take(filename):
@@ -107,8 +105,7 @@ def build_combinations(groups, count, seed=42):
     return result
 
 
-def wrap_text(text, max_chars=22):
-    """Quebra o texto em linhas para caber no headline."""
+def wrap_text(text, max_chars=24):
     words = text.split()
     lines = []
     current = ''
@@ -124,49 +121,48 @@ def wrap_text(text, max_chars=22):
     return lines
 
 
-def build_headline_filter(text, style_seed, font_path=FONT_PATH):
-    """
-    Gera o filtro FFmpeg para o headline no topo.
-    style_seed par = fundo branco + texto preto
-    style_seed ímpar = fundo preto + texto branco
-    Retorna string de filtro vf pronta para uso.
-    """
+def build_headline_filter(text, style_seed, headline_duration, font_path=FONT_PATH):
     if not text or not text.strip():
         return None
 
-    # Variação de cor por vídeo — determinística pelo seed
-    dark_style = (style_seed % 2 == 1)
-    bg_color    = '0x000000DD' if dark_style else '0xFFFFFFEE'
-    font_color  = 'white'      if dark_style else 'black'
+    dark_style   = (style_seed % 2 == 1)
+    bg_color     = '0x000000E6' if dark_style else '0xFFFFFFEE'
+    font_color   = 'white'      if dark_style else 'black'
 
-    font_size   = 54
-    pad_x       = 40
-    pad_y       = 22
-    line_spacing = 8
-    corner_r    = 14
+    font_size    = 52
+    pad_x        = 36
+    pad_y        = 18
+    line_spacing = 10
 
-    lines = wrap_text(text.strip(), max_chars=22)
+    lines     = wrap_text(text.strip(), max_chars=24)
     num_lines = len(lines)
+    line_h    = font_size + line_spacing
+    box_h     = pad_y * 2 + line_h * num_lines - line_spacing
 
-    # Altura total do bloco
-    line_h   = font_size + line_spacing
-    box_h    = pad_y * 2 + line_h * num_lines - line_spacing
-    box_w    = TARGET_W - 120   # margem lateral de 60px de cada lado
-    box_x    = 60
-    box_y    = TEXT_Y_TOP
+    # Largura dinâmica: baseada no número de chars da linha mais longa
+    max_chars_line = max(len(l) for l in lines)
+    # ~28px por caractere em font_size 52 Poppins ExtraBold
+    estimated_w = max_chars_line * 28 + pad_x * 2
+    box_w = min(estimated_w, TARGET_W - 80)  # máximo com margem de 40px de cada lado
+    box_w = max(box_w, 300)                  # mínimo razoável
+    box_x = (TARGET_W - box_w) // 2
+    box_y = TEXT_Y_TOP
 
-    # Constrói filtros: drawbox (fundo) + drawtext por linha
+    # Tempo de exibição: enable/disable por timestamp
+    time_enable  = "0"
+    time_disable = str(float(headline_duration))
+
     filters = []
 
-    # Fundo com bordas arredondadas via drawbox
+    # Fundo
     filters.append(
         f"drawbox=x={box_x}:y={box_y}:w={box_w}:h={box_h}:"
-        f"color={bg_color}:t=fill"
+        f"color={bg_color}:t=fill:"
+        f"enable='between(t,{time_enable},{time_disable})'"
     )
 
-    # Texto linha por linha, centralizado
+    # Texto linha por linha
     for i, line in enumerate(lines):
-        # Escapa caracteres especiais para o FFmpeg drawtext
         line_escaped = (line
             .replace('\\', '\\\\')
             .replace(':', '\\:')
@@ -180,7 +176,7 @@ def build_headline_filter(text, style_seed, font_path=FONT_PATH):
             f"fontsize={font_size}:"
             f"x=(w-text_w)/2:"
             f"y={text_y}:"
-            f"line_spacing=0"
+            f"enable='between(t,{time_enable},{time_disable})'"
         )
 
     return ','.join(filters)
@@ -188,10 +184,6 @@ def build_headline_filter(text, style_seed, font_path=FONT_PATH):
 
 def normalize_segment(src, dst, trim_start, duration,
                       zoom_factor=1.0, headline_filter=None):
-    """
-    Re-encoda segmento para H264/AAC preservando color space original.
-    Aplica headline via drawtext se fornecido.
-    """
     vf_parts = []
 
     if zoom_factor > 1.0:
@@ -258,17 +250,19 @@ def concat_segments(seg_files, output_path):
     return r.returncode == 0 and os.path.exists(output_path)
 
 
-def render_variation(groups, combo, output_path, tmp_dir, headline_text=''):
+def render_variation(groups, combo, output_path, tmp_dir,
+                     headline_text='', headline_duration=3):
     rng = random.Random(combo['_micro_seed'] * 9973 + 1337)
     os.makedirs(tmp_dir, exist_ok=True)
     seg_files = []
+    takes_used = {}  # block -> lista de nomes de arquivo
 
-    # Headline: determina estilo UMA vez por vídeo (seed do combo)
     headline_filter = None
     if headline_text and headline_text.strip():
         headline_filter = build_headline_filter(
             headline_text,
-            style_seed=combo['_micro_seed']
+            style_seed=combo['_micro_seed'],
+            headline_duration=headline_duration
         )
 
     all_segs = []
@@ -277,6 +271,11 @@ def render_variation(groups, combo, output_path, tmp_dir, headline_text=''):
             continue
         for part_idx, filepath in enumerate(groups[block][combo[block]]):
             all_segs.append((block, part_idx, filepath))
+            if block not in takes_used:
+                takes_used[block] = []
+            fname = os.path.basename(filepath)
+            if fname not in takes_used[block]:
+                takes_used[block].append(fname)
 
     total = len(all_segs)
 
@@ -299,7 +298,7 @@ def render_variation(groups, combo, output_path, tmp_dir, headline_text=''):
 
         seg_out = os.path.join(tmp_dir, f'seg_{i:03d}.mp4')
 
-        # Headline só no primeiro segmento (hook) — onde o texto faz sentido
+        # Headline só no primeiro segmento
         seg_headline = headline_filter if is_first else None
 
         ok = normalize_segment(
@@ -315,16 +314,20 @@ def render_variation(groups, combo, output_path, tmp_dir, headline_text=''):
             print(f"[WARN] Falhou segmento {i}: {filepath}")
 
     if not seg_files:
-        return False
+        return False, {}
+
     if len(seg_files) == 1:
         shutil.move(seg_files[0], output_path)
-        return True
-    return concat_segments(seg_files, output_path)
+        return os.path.exists(output_path), takes_used
+
+    ok = concat_segments(seg_files, output_path)
+    return ok, takes_used
 
 
 @app.function(timeout=1800, memory=2048)
 def process_job_http(job_id: str, file_urls: list, output_base_url: str,
-                     count: int, headline_text: str = ''):
+                     count: int, headline_text: str = '',
+                     headline_duration: int = 3):
     import requests
     import time
 
@@ -345,7 +348,6 @@ def process_job_http(job_id: str, file_urls: list, output_base_url: str,
                 try:
                     if attempt > 0:
                         time.sleep(3 * attempt)
-                        print(f"[RETRY] {fname} tentativa {attempt+1}")
                     with requests.get(url, timeout=120, stream=True) as r:
                         if r.status_code == 200:
                             with open(local_path, 'wb') as f:
@@ -355,37 +357,45 @@ def process_job_http(job_id: str, file_urls: list, output_base_url: str,
                             file_list.append(local_path)
                             downloaded = True
                             break
-                        else:
-                            print(f"[WARN] HTTP {r.status_code} para {fname}")
                 except Exception as e:
                     print(f"[ERR] Download {fname}: {e}")
             if not downloaded:
-                print(f"[SKIP] Falhou após 5 tentativas: {fname}")
+                print(f"[SKIP] {fname}")
 
         if not file_list:
             return {'error': 'no files downloaded'}
 
         groups = group_takes(file_list)
         print(f"[INFO] Blocos: {list(groups.keys())}")
-        print(f"[INFO] Headline: '{headline_text}'")
 
         combos = build_combinations(groups, count)
         output_files = []
+        combo_map = {}  # fname -> takes_used
 
         for i, combo in enumerate(combos):
-            print(f"[RENDER] Variação {i+1}/{count}")
+            print(f"[RENDER] {i+1}/{count}")
             out_path = os.path.join(output_dir, f'variation_{i+1:02d}.mp4')
             tmp_dir  = os.path.join(tmp_base, f'tmp_{i}')
 
-            success = render_variation(
+            success, takes_used = render_variation(
                 groups, combo, out_path, tmp_dir,
-                headline_text=headline_text
+                headline_text=headline_text,
+                headline_duration=headline_duration
             )
             shutil.rmtree(tmp_dir, ignore_errors=True)
 
             if success and os.path.exists(out_path):
                 fname = f'variation_{i+1:02d}.mp4'
-                print(f"[UPLOAD] {fname} ({os.path.getsize(out_path)//1024//1024}MB)")
+
+                # Envia metadata de takes junto com o vídeo
+                meta = json.dumps(takes_used)
+                resp_meta = requests.put(
+                    f"{output_base_url}/meta/{fname}",
+                    data=meta.encode(),
+                    headers={'Content-Type': 'application/json'},
+                    timeout=30
+                )
+
                 with open(out_path, 'rb') as f:
                     resp = requests.put(
                         f"{output_base_url}/{fname}",
@@ -395,12 +405,11 @@ def process_job_http(job_id: str, file_urls: list, output_base_url: str,
                     )
                 if resp.status_code == 200:
                     output_files.append(fname)
+                    combo_map[fname] = takes_used
                     print(f"[OK] {fname}")
-                else:
-                    print(f"[ERR] Upload {fname}: {resp.status_code}")
                 os.remove(out_path)
             else:
-                print(f"[ERR] Render falhou variação {i+1}")
+                print(f"[ERR] Render falhou {i+1}")
 
         return {'status': 'done', 'files': output_files, 'count': len(output_files)}
 
