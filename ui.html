@@ -973,9 +973,9 @@ function renderPartialResults(files) {
           <div class="result-takes">${takesLine || '—'}</div>
           <div class="result-status">pronto</div>
         </div>
-        <a class="btn-dl-item" href="/download/${currentJobId}/${fname}" download="varvid_${num}.mp4">
-          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-        </a>`;
+        <a class="btn-dl-item" href="/download/${currentJobId}/${fname}" style="opacity:0.25;cursor:not-allowed;display:flex;align-items:center;justify-content:center">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" width="16" height="16"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        </div>`;
       listM.appendChild(item);
     }
 
@@ -986,7 +986,7 @@ function renderPartialResults(files) {
       card.innerHTML = `
         <div class="result-top"><div class="result-num-d">V${num}</div><div class="result-dot"></div></div>
         <div class="result-blocks">${buildCardBlocks(fname)}</div>
-        <a class="btn-dl-d" href="/download/${currentJobId}/${fname}" download="varvid_${num}.mp4">⬇ baixar</a>`;
+        <div class="btn-dl-d" style="opacity:0.25;cursor:not-allowed;color:#333">aguardando...</div>`;
       gridD.appendChild(card);
     }
   });
@@ -1018,6 +1018,17 @@ function showResults(data) {
   if (raD) raD.classList.add('visible');
   const rcD = document.getElementById('results-count-d');
   if (rcD) rcD.textContent = total + ' vídeo' + (total !== 1 ? 's' : '') + ' pronto' + (total !== 1 ? 's' : '');
+  // Aviso de tempo
+  ['results-area-m','results-area-d'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el && !el.querySelector('.dl-warning')) {
+      const warn = document.createElement('div');
+      warn.className = 'dl-warning';
+      warn.style.cssText = 'font-size:10px;color:#FB923C;background:rgba(251,146,60,0.08);border:1px solid rgba(251,146,60,0.2);border-radius:8px;padding:7px 10px;margin-bottom:10px';
+      warn.textContent = '⏱ Baixe todos antes de limpar o disco — os vídeos ficam disponíveis até você clicar em Limpar.';
+      el.insertBefore(warn, el.firstChild);
+    }
+  });
   const retD = document.getElementById('btn-retry-d');
   if (retD) { retD.style.display = total < numVariations ? 'block' : 'none'; }
   const gridD = document.getElementById('results-grid-d');
