@@ -522,11 +522,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
         <div class="logo-icon"><svg viewBox="0 0 15 15" fill="none" width="15" height="15"><rect x="1" y="1" width="5.5" height="5.5" rx="1.5" fill="#000"/><rect x="8.5" y="1" width="5.5" height="5.5" rx="1.5" fill="#000" opacity=".6"/><rect x="1" y="8.5" width="5.5" height="5.5" rx="1.5" fill="#000" opacity=".6"/><rect x="8.5" y="8.5" width="5.5" height="5.5" rx="1.5" fill="#000" opacity=".25"/></svg></div>
         <span class="logo-name">VarVid</span><span class="logo-ver">v6.0</span>
       </div>
-      <div id="clear-wrap-d" style="display:none;flex-direction:column;align-items:flex-end;gap:4px">
-        <div style="display:flex;align-items:center;gap:6px">
-          <button onclick="clearDisk()" id="btn-clear" style="font-size:11px;font-weight:600;color:#000;background:#E8FF47;border:none;padding:5px 14px;border-radius:20px;cursor:pointer;font-family:Inter,sans-serif;transition:opacity 0.2s;white-space:nowrap" onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'">⌫ Baixou? Limpe o disco →</button>
-        </div>
-      </div>
+      <div id="clear-wrap-d" style="display:none"></div>
     </div>
 
     <div class="naming-section">
@@ -632,6 +628,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
         <div class="results-count" id="results-count-d">0 vídeos prontos</div>
         <div style="display:flex;gap:8px;align-items:center">
           <button id="btn-retry-d" onclick="retryMissing()" style="display:none;font-size:10px;color:#FB923C;background:transparent;border:1px solid #FB923C40;padding:5px 12px;border-radius:6px;cursor:pointer;">↺ Regenerar faltantes</button>
+          <button id="btn-clear-results-d" onclick="clearDisk()" style="display:none;font-size:10px;font-weight:600;color:#000;background:#E8FF47;border:none;padding:5px 14px;border-radius:20px;cursor:pointer;font-family:Inter,sans-serif;">⌫ Baixou? Limpe</button>
           <button class="btn-dl-all" onclick="downloadAll()">⬇ BAIXAR TODOS</button>
         </div>
       </div>
@@ -1035,10 +1032,10 @@ function showResults(data) {
   if (gridD) { gridD.innerHTML = ''; generatedFiles.forEach((fname, idx) => { const num = String(idx+1).padStart(2,'0'); const card = document.createElement('div'); card.className = 'result-card'; card.innerHTML = `<div class="result-top"><div class="result-num-d">V${num}</div><div class="result-dot"></div></div><div class="result-blocks">${buildCardBlocks(fname)}</div><a class="btn-dl-d" href="/download/${currentJobId}/${fname}" download="varvid_${num}.mp4">⬇ baixar</a>`; gridD.appendChild(card); }); }
 
   // Acende botão de limpar
-  ['clear-wrap-d', 'clear-wrap-m'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.style.display = 'flex';
-  });
+  const btnClearD = document.getElementById('btn-clear-results-d');
+  if (btnClearD) btnClearD.style.display = 'inline-block';
+  const clearM = document.getElementById('clear-wrap-m');
+  if (clearM) clearM.style.display = 'flex';
 
   // Switch mobile tab to results
   showTab('results');
@@ -1084,10 +1081,10 @@ async function clearDisk() {
     takesMap = {};
     selectedFiles = [];
     // Esconde botão de limpar
-    ['clear-wrap-d', 'clear-wrap-m'].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.style.display = 'none';
-    });
+    const btnClearD2 = document.getElementById('btn-clear-results-d');
+    if (btnClearD2) btnClearD2.style.display = 'none';
+    const clearM2 = document.getElementById('clear-wrap-m');
+    if (clearM2) clearM2.style.display = 'none';
     // Reseta UI
     ['results-area-m', 'results-area-d'].forEach(id => {
       const el = document.getElementById(id);
