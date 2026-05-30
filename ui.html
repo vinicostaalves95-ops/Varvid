@@ -648,6 +648,38 @@ let generatedFiles = [];
 let jobSummary = {};
 let takesMap = {};
 
+// Restaurar estado salvo
+(function restoreState() {
+  const savedJobId = localStorage.getItem('varvid_job_id');
+  const savedFiles = localStorage.getItem('varvid_files');
+  if (savedJobId && savedFiles) {
+    try {
+      const files = JSON.parse(savedFiles);
+      if (files && files.length > 0) {
+        currentJobId = savedJobId;
+        generatedFiles = files;
+        // Mostrar resultados restaurados após DOM carregar
+        window.addEventListener('DOMContentLoaded', () => {
+          setTimeout(() => {
+            showResults({ files: files, takes_map: {} });
+            // Aviso de restauração
+            ['results-area-m','results-area-d'].forEach(id => {
+              const el = document.getElementById(id);
+              if (el && !el.querySelector('.restore-warn')) {
+                const w = document.createElement('div');
+                w.className = 'restore-warn';
+                w.style.cssText = 'font-size:10px;color:#60A5FA;background:rgba(96,165,250,0.08);border:1px solid rgba(96,165,250,0.2);border-radius:8px;padding:7px 10px;margin-bottom:10px';
+                w.textContent = '↩ Sessão restaurada — seus vídeos ainda estão disponíveis para download.';
+                el.insertBefore(w, el.firstChild);
+              }
+            });
+          }, 300);
+        });
+      }
+    } catch(e) {}
+  }
+})();
+
 const BLOCK_ORDER = ['hook','story','revelacao','prova','cta'];
 const SWAPPABLE = new Set(['hook','cta']);
 
@@ -701,6 +733,7 @@ async function uploadAndAnalyze(loadingId, badgeId) {
     const data = await res.json();
     if (data.error) { alert('Erro: ' + data.error); return; }
     currentJobId = data.job_id;
+    localStorage.setItem('varvid_job_id', data.job_id);
     jobSummary = data.summary || {};
     updateMatrix(data.summary, data.max_combinations);
     if (data.avg_duration) {
@@ -992,6 +1025,8 @@ function renderPartialResults(files) {
 function showResults(data) {
   if (data.takes_map) takesMap = data.takes_map;
   generatedFiles = data.files || [];
+  localStorage.setItem('varvid_files', JSON.stringify(generatedFiles));
+  localStorage.setItem('varvid_job_id', currentJobId);
   const total = generatedFiles.length;
 
   ['progress-area-m','progress-area-d'].forEach(id => { const el = document.getElementById(id); if (el) el.classList.remove('visible'); });
@@ -1080,6 +1115,8 @@ async function clearDisk() {
     generatedFiles = [];
     takesMap = {};
     selectedFiles = [];
+    localStorage.removeItem('varvid_job_id');
+    localStorage.removeItem('varvid_files');
     // Esconde botão de limpar
     const btnClearD2 = document.getElementById('btn-clear-results-d');
     if (btnClearD2) btnClearD2.style.display = 'none';
