@@ -310,6 +310,8 @@ def normalize_segment(src, dst, trim_start, duration,
         dst
     ]
     r = subprocess.run(cmd, capture_output=True)
+    if r.returncode != 0:
+        print(f"[FFMPEG_ERR] {r.stderr.decode()[-500:]}")
     return r.returncode == 0 and os.path.exists(dst)
 
 
