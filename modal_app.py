@@ -15,6 +15,7 @@ image = (
     .pip_install("requests", "numpy")
     .pip_install("mediapipe==0.10.9", "opencv-python-headless")
     .run_commands(
+        "echo 'rebuild-v9-ultrafast'",
         "mkdir -p /usr/share/fonts/poppins",
         "wget -q -O /usr/share/fonts/poppins/Poppins-ExtraBold.ttf "
         "'https://github.com/google/fonts/raw/main/ofl/poppins/Poppins-ExtraBold.ttf'",
