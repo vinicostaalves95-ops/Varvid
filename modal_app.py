@@ -366,11 +366,7 @@ def render_variation(groups, combo, output_path, tmp_dir,
     # Pitch shift — único por vídeo: ±0.5 semitom máximo
     pitch_shift = 0.0  # pitch shift removido
 
-    print(f"[COLOR] brightness={color_params['brightness']:.3f} "
-          f"contrast={color_params['contrast']:.3f} "
-          f"sat={color_params['saturation']:.3f} "
-          f"r={color_params['r_gain']:.3f} b={color_params['b_gain']:.3f}")
-    print(f"[PITCH] {pitch_shift:+.2f} semitons")
+    pass  # cor e pitch removidos
 
     all_segs = []
     for block in BLOCK_ORDER:
