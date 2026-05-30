@@ -64,7 +64,7 @@ def cleanup_all():
 @app.route('/admin/clear', methods=['POST'])
 def admin_clear():
     cleanup_all()
-    return jsonify({'ok': True, 'msg': 'Disco limpo com sucesso'})
+    return jsonify({'ok': True})
 
 
 @app.route('/')
@@ -78,6 +78,22 @@ def serve_file(job_id, filename):
     if not os.path.exists(path):
         abort(404)
     return send_file(path)
+
+
+@app.route('/output/<job_id>/meta/<filename>', methods=['PUT'])
+def receive_meta(job_id, filename):
+    """Recebe metadata de takes usados por variação."""
+    try:
+        takes_used = json.loads(request.data.decode())
+        job = load_job(job_id)
+        if job:
+            if 'takes_map' not in job:
+                job['takes_map'] = {}
+            job['takes_map'][filename] = takes_used
+            save_job(job_id, job)
+    except Exception as e:
+        print(f"[WARN] meta parse error: {e}")
+    return jsonify({'ok': True})
 
 
 @app.route('/output/<job_id>/<filename>', methods=['PUT'])
@@ -125,9 +141,26 @@ def analyze():
         if not saved_paths:
             return jsonify({'error': 'no valid files'}), 400
 
-        from engine import group_takes, summarize_groups
+        from engine import group_takes, summarize_groups, get_duration
         groups = group_takes(saved_paths)
         summary = summarize_groups(groups)
+
+        # Calcula duração média dos vídeos combinados
+        avg_duration = 0.0
+        try:
+            total_dur = 0.0
+            block_count = 0
+            for block in BLOCK_ORDER:
+                if block in groups:
+                    # Pega a duração média das variantes do bloco
+                    variant_durs = []
+                    for v_files in groups[block].values():
+                        variant_durs.append(sum(get_duration(f) for f in v_files))
+                    total_dur += sum(variant_durs) / len(variant_durs)
+                    block_count += 1
+            avg_duration = round(total_dur, 1)
+        except Exception:
+            avg_duration = 0.0
 
         swappable_options = []
         for b in BLOCK_ORDER:
@@ -141,8 +174,10 @@ def analyze():
             'status': 'ready',
             'summary': summary,
             'max_combinations': max_unique,
+            'avg_duration': avg_duration,
             'files': [],
             'completed': 0,
+            'takes_map': {},
         }
         save_job(job_id, job_data)
 
@@ -150,6 +185,7 @@ def analyze():
             'job_id': job_id,
             'summary': summary,
             'max_combinations': max_unique,
+            'avg_duration': avg_duration,
             'blocks_found': list(summary.keys()),
         })
 
@@ -165,6 +201,7 @@ def generate():
     job_id = data.get('job_id')
     count = int(data.get('count', 5))
     headline_text = data.get('headline_text', '').strip()
+    headline_duration = int(data.get('headline_duration', 3))
 
     job = load_job(job_id)
     if not job:
@@ -183,6 +220,8 @@ def generate():
     job['completed'] = 0
     job['count_requested'] = count
     job['headline_text'] = headline_text
+    job['headline_duration'] = headline_duration
+    job['takes_map'] = {}
     save_job(job_id, job)
 
     file_urls = [
@@ -196,7 +235,8 @@ def generate():
         try:
             modal_fn("process_job_http").remote(
                 job_id, file_urls, output_base_url, count,
-                headline_text=headline_text
+                headline_text=headline_text,
+                headline_duration=headline_duration
             )
             shutil.rmtree(takes_dir, ignore_errors=True)
             j = load_job(job_id)
@@ -226,7 +266,8 @@ def status(job_id):
     if os.path.exists(out_dir):
         done = sorted([f for f in os.listdir(out_dir) if f.endswith('.mp4')])
         if job is None:
-            job = {'status': 'rendering', 'files': [], 'completed': 0, 'count_requested': len(done) or 5}
+            job = {'status': 'rendering', 'files': [], 'completed': 0,
+                   'count_requested': len(done) or 5, 'takes_map': {}}
         job['files'] = done
         job['completed'] = len(done)
         count_req = job.get('count_requested', 5)
