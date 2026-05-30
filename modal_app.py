@@ -11,8 +11,8 @@ from itertools import product as iterproduct
 
 image = (
     modal.Image.debian_slim(python_version="3.11")
-    .apt_install("ffmpeg", "wget", "fontconfig")
-    .pip_install("requests")
+    .apt_install("ffmpeg", "wget", "fontconfig", "libgl1", "libglib2.0-0")
+    .pip_install("requests", "mediapipe", "opencv-python-headless", "numpy")
     .run_commands(
         "mkdir -p /usr/share/fonts/poppins",
         "wget -q -O /usr/share/fonts/poppins/Poppins-ExtraBold.ttf "
@@ -26,7 +26,7 @@ app = modal.App("varvid", image=image)
 BLOCK_ORDER = ['hook', 'story', 'revelacao', 'prova', 'cta']
 BLOCK_ALIASES = {
     'hook':      ['hook', 'he1', 'he2', 'he3', 'he4', 'he5', 'h1', 'h2', 'h3'],
-    'story':     ['story', 'storia', 'estoria'],
+    'story':     ['story', 'historia', 'estoria'],
     'revelacao': ['revelac', 'revelação', 'revelacao', 'rev'],
     'prova':     ['prova', 'proof', 'resultado'],
     'cta':       ['cta', 'call'],
@@ -36,8 +36,6 @@ SWAPPABLE_BLOCKS = {'hook', 'cta'}
 TARGET_W = 1080
 TARGET_H = 1920
 FONT_PATH = '/usr/share/fonts/poppins/Poppins-ExtraBold.ttf'
-
-# Zona segura TikTok: abaixo da barra de status (~13% do topo)
 TEXT_Y_TOP = 260
 
 
@@ -90,6 +88,69 @@ def get_duration(filepath):
         return 0.0
 
 
+def detect_face_center(filepath):
+    """
+    Analisa o frame central do take com MediaPipe.
+    Retorna (cx_norm, cy_norm) — posição normalizada 0-1 do centro do rosto.
+    Retorna None se não detectar rosto.
+    """
+    try:
+        import cv2
+        import mediapipe as mp
+
+        duration = get_duration(filepath)
+        if duration < 0.1:
+            return None
+
+        # Extrai frame do meio do take
+        mid = duration / 2
+        tmp_frame = f'/tmp/face_{uuid.uuid4().hex[:8]}.jpg'
+        cmd = [
+            'ffmpeg', '-y',
+            '-ss', str(mid),
+            '-i', filepath,
+            '-frames:v', '1',
+            '-q:v', '2',
+            tmp_frame
+        ]
+        r = subprocess.run(cmd, capture_output=True)
+        if r.returncode != 0 or not os.path.exists(tmp_frame):
+            return None
+
+        img = cv2.imread(tmp_frame)
+        os.remove(tmp_frame)
+        if img is None:
+            return None
+
+        h, w = img.shape[:2]
+        img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
+        mp_face = mp.solutions.face_detection
+        with mp_face.FaceDetection(model_selection=1, min_detection_confidence=0.5) as detector:
+            results = detector.process(img_rgb)
+
+        if not results.detections:
+            return None
+
+        # Pega o rosto mais prominente (maior bounding box)
+        best = max(results.detections, key=lambda d: d.location_data.relative_bounding_box.width)
+        bb = best.location_data.relative_bounding_box
+
+        # Centro normalizado do rosto
+        cx = bb.xmin + bb.width / 2
+        cy = bb.ymin + bb.height / 2
+
+        # Garante que está dentro dos bounds
+        cx = max(0.1, min(0.9, cx))
+        cy = max(0.1, min(0.9, cy))
+
+        return (cx, cy)
+
+    except Exception as e:
+        print(f"[FACE] Erro na detecção: {e}")
+        return None
+
+
 def build_combinations(groups, count, seed=42):
     rng = random.Random(seed)
     choices = {b: sorted(groups[b].keys()) for b in BLOCK_ORDER if b in groups}
@@ -125,13 +186,12 @@ def build_headline_filter(text, style_seed, headline_duration, font_path=FONT_PA
     if not text or not text.strip():
         return None
 
-    dark_style   = (style_seed % 2 == 1)
-    bg_color     = '0x000000E6' if dark_style else '0xFFFFFFEE'
-    font_color   = 'white'      if dark_style else 'black'
-
-    font_size    = 52
-    pad_x        = 36
-    pad_y        = 18
+    dark_style  = (style_seed % 2 == 1)
+    bg_color    = '0x000000E6' if dark_style else '0xFFFFFFEE'
+    font_color  = 'white'      if dark_style else 'black'
+    font_size   = 52
+    pad_x       = 36
+    pad_y       = 18
     line_spacing = 10
 
     lines     = wrap_text(text.strip(), max_chars=24)
@@ -139,35 +199,22 @@ def build_headline_filter(text, style_seed, headline_duration, font_path=FONT_PA
     line_h    = font_size + line_spacing
     box_h     = pad_y * 2 + line_h * num_lines - line_spacing
 
-    # Largura dinâmica: baseada no número de chars da linha mais longa
     max_chars_line = max(len(l) for l in lines)
-    # ~28px por caractere em font_size 52 Poppins ExtraBold
     estimated_w = max_chars_line * 28 + pad_x * 2
-    box_w = min(estimated_w, TARGET_W - 80)  # máximo com margem de 40px de cada lado
-    box_w = max(box_w, 300)                  # mínimo razoável
+    box_w = min(estimated_w, TARGET_W - 80)
+    box_w = max(box_w, 300)
     box_x = (TARGET_W - box_w) // 2
     box_y = TEXT_Y_TOP
 
-    # Tempo de exibição: enable/disable por timestamp
-    time_enable  = "0"
     time_disable = str(float(headline_duration))
-
     filters = []
-
-    # Fundo
     filters.append(
         f"drawbox=x={box_x}:y={box_y}:w={box_w}:h={box_h}:"
         f"color={bg_color}:t=fill:"
-        f"enable='between(t,{time_enable},{time_disable})'"
+        f"enable='between(t,0,{time_disable})'"
     )
-
-    # Texto linha por linha
     for i, line in enumerate(lines):
-        line_escaped = (line
-            .replace('\\', '\\\\')
-            .replace(':', '\\:')
-            .replace("'", "\\'")
-        )
+        line_escaped = line.replace('\\', '\\\\').replace(':', '\\:').replace("'", "\\'")
         text_y = box_y + pad_y + i * line_h
         filters.append(
             f"drawtext=fontfile='{font_path}':"
@@ -176,26 +223,46 @@ def build_headline_filter(text, style_seed, headline_duration, font_path=FONT_PA
             f"fontsize={font_size}:"
             f"x=(w-text_w)/2:"
             f"y={text_y}:"
-            f"enable='between(t,{time_enable},{time_disable})'"
+            f"enable='between(t,0,{time_disable})'"
         )
-
     return ','.join(filters)
 
 
+def build_zoom_filter(zoom_factor, face_center=None):
+    """
+    Constrói filtro de crop+scale para zoom.
+    Se face_center fornecido, centraliza o crop no rosto.
+    Caso contrário, usa centro da imagem.
+    """
+    z = zoom_factor
+    w = int(TARGET_W / z)
+    h = int(TARGET_H / z)
+
+    if face_center:
+        cx_norm, cy_norm = face_center
+        # Converte posição normalizada para pixels
+        cx_px = int(cx_norm * TARGET_W)
+        cy_px = int(cy_norm * TARGET_H)
+        # Calcula x,y do crop centrado no rosto
+        x = cx_px - w // 2
+        y = cy_px - h // 2
+        # Garante que não sai dos bounds
+        x = max(0, min(TARGET_W - w, x))
+        y = max(0, min(TARGET_H - h, y))
+    else:
+        # Fallback: centro da imagem
+        x = (TARGET_W - w) // 2
+        y = (TARGET_H - h) // 2
+
+    return f'crop={w}:{h}:{x}:{y},scale={TARGET_W}:{TARGET_H}:flags=lanczos,format=yuv420p'
+
+
 def normalize_segment(src, dst, trim_start, duration,
-                      zoom_factor=1.0, headline_filter=None):
+                      zoom_factor=1.0, face_center=None, headline_filter=None):
     vf_parts = []
 
     if zoom_factor > 1.0:
-        w = int(TARGET_W / zoom_factor)
-        h = int(TARGET_H / zoom_factor)
-        x = int((TARGET_W - w) / 2)
-        y = int((TARGET_H - h) / 2)
-        vf_parts.append(
-            f'crop={w}:{h}:{x}:{y},'
-            f'scale={TARGET_W}:{TARGET_H}:flags=lanczos,'
-            f'format=yuv420p'
-        )
+        vf_parts.append(build_zoom_filter(zoom_factor, face_center))
     else:
         vf_parts.append(
             f'scale={TARGET_W}:{TARGET_H}:'
@@ -251,11 +318,12 @@ def concat_segments(seg_files, output_path):
 
 
 def render_variation(groups, combo, output_path, tmp_dir,
-                     headline_text='', headline_duration=3):
+                     headline_text='', headline_duration=3,
+                     face_cache=None):
     rng = random.Random(combo['_micro_seed'] * 9973 + 1337)
     os.makedirs(tmp_dir, exist_ok=True)
     seg_files = []
-    takes_used = {}  # block -> lista de nomes de arquivo
+    takes_used = {}
 
     headline_filter = None
     if headline_text and headline_text.strip():
@@ -293,18 +361,23 @@ def render_variation(groups, combo, output_path, tmp_dir,
             trim_end = trim_start + 0.5
         actual_duration = trim_end - trim_start
 
+        # Zoom: aplica em segmentos do meio com 20% de chance
         apply_zoom = (not is_first and not is_last and rng.random() < 0.20)
         zoom_factor = rng.uniform(1.03, 1.07) if apply_zoom else 1.0
 
-        seg_out = os.path.join(tmp_dir, f'seg_{i:03d}.mp4')
+        # Face center: usa cache se disponível
+        face_center = None
+        if apply_zoom and face_cache is not None:
+            face_center = face_cache.get(filepath)
 
-        # Headline só no primeiro segmento
+        seg_out = os.path.join(tmp_dir, f'seg_{i:03d}.mp4')
         seg_headline = headline_filter if is_first else None
 
         ok = normalize_segment(
             filepath, seg_out,
             trim_start, actual_duration,
             zoom_factor=zoom_factor,
+            face_center=face_center,
             headline_filter=seg_headline
         )
 
@@ -315,11 +388,9 @@ def render_variation(groups, combo, output_path, tmp_dir,
 
     if not seg_files:
         return False, {}
-
     if len(seg_files) == 1:
         shutil.move(seg_files[0], output_path)
         return os.path.exists(output_path), takes_used
-
     ok = concat_segments(seg_files, output_path)
     return ok, takes_used
 
@@ -338,6 +409,7 @@ def process_job_http(job_id: str, file_urls: list, output_base_url: str,
     os.makedirs(output_dir, exist_ok=True)
 
     try:
+        # Download dos takes
         file_list = []
         for url in file_urls:
             fname = url.split('/')[-1]
@@ -368,9 +440,17 @@ def process_job_http(job_id: str, file_urls: list, output_base_url: str,
         groups = group_takes(file_list)
         print(f"[INFO] Blocos: {list(groups.keys())}")
 
+        # Análise de rostos — roda UMA vez por take, cacheia resultado
+        print("[FACE] Analisando rostos nos takes...")
+        face_cache = {}
+        for filepath in file_list:
+            result = detect_face_center(filepath)
+            face_cache[filepath] = result
+            status = f"({result[0]:.2f}, {result[1]:.2f})" if result else "não detectado"
+            print(f"[FACE] {os.path.basename(filepath)}: {status}")
+
         combos = build_combinations(groups, count)
         output_files = []
-        combo_map = {}  # fname -> takes_used
 
         for i, combo in enumerate(combos):
             print(f"[RENDER] {i+1}/{count}")
@@ -380,16 +460,17 @@ def process_job_http(job_id: str, file_urls: list, output_base_url: str,
             success, takes_used = render_variation(
                 groups, combo, out_path, tmp_dir,
                 headline_text=headline_text,
-                headline_duration=headline_duration
+                headline_duration=headline_duration,
+                face_cache=face_cache
             )
             shutil.rmtree(tmp_dir, ignore_errors=True)
 
             if success and os.path.exists(out_path):
                 fname = f'variation_{i+1:02d}.mp4'
 
-                # Envia metadata de takes junto com o vídeo
+                # Envia metadata
                 meta = json.dumps(takes_used)
-                resp_meta = requests.put(
+                requests.put(
                     f"{output_base_url}/meta/{fname}",
                     data=meta.encode(),
                     headers={'Content-Type': 'application/json'},
@@ -405,7 +486,6 @@ def process_job_http(job_id: str, file_urls: list, output_base_url: str,
                     )
                 if resp.status_code == 200:
                     output_files.append(fname)
-                    combo_map[fname] = takes_used
                     print(f"[OK] {fname}")
                 os.remove(out_path)
             else:
