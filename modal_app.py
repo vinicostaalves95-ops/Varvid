@@ -27,7 +27,6 @@ BLOCK_ALIASES = {
 }
 SWAPPABLE_BLOCKS = {'hook', 'cta'}
 
-# Resolução alvo — portrait TikTok
 TARGET_W = 1080
 TARGET_H = 1920
 
@@ -81,6 +80,25 @@ def get_duration(filepath):
         return 0.0
 
 
+def get_video_colorspace(filepath):
+    """Detecta o color space original do arquivo para preservar na conversão."""
+    result = subprocess.run(
+        ['ffprobe', '-v', 'quiet', '-print_format', 'json',
+         '-show_streams', '-select_streams', 'v:0', filepath],
+        capture_output=True, text=True
+    )
+    try:
+        data = json.loads(result.stdout)
+        stream = data['streams'][0]
+        return {
+            'color_space':    stream.get('color_space', 'unknown'),
+            'color_primaries': stream.get('color_primaries', 'unknown'),
+            'color_transfer':  stream.get('color_transfer', 'unknown'),
+        }
+    except:
+        return {}
+
+
 def build_combinations(groups, count, seed=42):
     rng = random.Random(seed)
     choices = {b: sorted(groups[b].keys()) for b in BLOCK_ORDER if b in groups}
@@ -98,12 +116,10 @@ def build_combinations(groups, count, seed=42):
 
 def normalize_segment(src, dst, trim_start, duration, zoom_factor=1.0):
     """
-    Re-encoda um segmento para H264/AAC com resolução e color space fixos.
-    Sempre re-encoda (nunca stream copy) para garantir codec uniforme no concat.
-    Aplica zoom se zoom_factor > 1.
+    Re-encoda um segmento para H264/AAC com resolução fixa.
+    Preserva o color space original do arquivo fonte — não força BT.709
+    para evitar desbotamento em takes gravados por iPhone ou Android.
     """
-    # Filtro de vídeo base: escala para resolução alvo com padding se necessário
-    # e corrige color space
     if zoom_factor > 1.0:
         w = int(TARGET_W / zoom_factor)
         h = int(TARGET_H / zoom_factor)
@@ -115,9 +131,9 @@ def normalize_segment(src, dst, trim_start, duration, zoom_factor=1.0):
             f'format=yuv420p'
         )
     else:
-        # Escala para resolução alvo mantendo aspect ratio com pad preto
         vf = (
-            f'scale={TARGET_W}:{TARGET_H}:force_original_aspect_ratio=decrease,'
+            f'scale={TARGET_W}:{TARGET_H}:'
+            f'force_original_aspect_ratio=decrease,'
             f'pad={TARGET_W}:{TARGET_H}:(ow-iw)/2:(oh-ih)/2:black,'
             f'format=yuv420p'
         )
@@ -130,12 +146,10 @@ def normalize_segment(src, dst, trim_start, duration, zoom_factor=1.0):
         '-vf', vf,
         '-c:v', 'libx264',
         '-preset', 'medium',
-        '-crf', '18',
+        '-crf', '23',           # Equilibrio qualidade/tamanho ideal para TikTok
         '-profile:v', 'high',
         '-level', '4.0',
-        '-colorspace', 'bt709',
-        '-color_primaries', 'bt709',
-        '-color_trc', 'bt709',
+        # SEM flags de colorspace — FFmpeg preserva os metadados originais do take
         '-c:a', 'aac',
         '-ar', '44100',
         '-ac', '2',
@@ -149,9 +163,6 @@ def normalize_segment(src, dst, trim_start, duration, zoom_factor=1.0):
 
 
 def concat_segments(seg_files, output_path):
-    """
-    Concatena segmentos já normalizados usando stream copy (todos têm o mesmo codec).
-    """
     concat_list = output_path + '.txt'
     with open(concat_list, 'w') as f:
         for sf in seg_files:
@@ -192,14 +203,12 @@ def render_variation(groups, combo, output_path, tmp_dir):
         is_first = (i == 0)
         is_last  = (i == total - 1)
 
-        # Micro-trim: remove poucos frames nas junções para suavizar cortes
         trim_start = 0.0 if is_first else rng.randint(1, 4) / 30.0
         trim_end   = duration if is_last else duration - (rng.randint(1, 3) / 30.0)
         if trim_end <= trim_start + 0.1:
             trim_end = trim_start + 0.5
         actual_duration = trim_end - trim_start
 
-        # Zoom sutil: só em segmentos do meio, 20% de chance
         apply_zoom = (not is_first and not is_last and rng.random() < 0.20)
         zoom_factor = rng.uniform(1.03, 1.07) if apply_zoom else 1.0
 
@@ -223,8 +232,8 @@ def render_variation(groups, combo, output_path, tmp_dir):
 
 @app.function(timeout=1800, memory=2048)
 def process_job_http(job_id: str, file_urls: list, output_base_url: str, count: int):
-    """Baixa arquivos do Render via HTTP, processa, envia outputs de volta."""
     import requests
+    import time
 
     tmp_base = f'/tmp/varvid_{job_id}'
     takes_dir = os.path.join(tmp_base, 'takes')
@@ -233,8 +242,6 @@ def process_job_http(job_id: str, file_urls: list, output_base_url: str, count: 
     os.makedirs(output_dir, exist_ok=True)
 
     try:
-        # Baixa cada arquivo do Render com retry
-        import time
         file_list = []
         for url in file_urls:
             fname = url.split('/')[-1]
