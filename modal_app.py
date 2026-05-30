@@ -297,7 +297,7 @@ def normalize_segment(src, dst, trim_start, duration,
         cmd += ['-af', af]
     cmd += [
         '-c:v', 'libx264',
-        '-preset', 'medium',
+        '-preset', 'ultrafast',
         '-crf', '23',
         '-profile:v', 'high',
         '-level', '4.0',
@@ -305,13 +305,14 @@ def normalize_segment(src, dst, trim_start, duration,
         '-ar', '44100',
         '-ac', '2',
         '-b:a', '128k',
+        '-threads', '2',
         '-avoid_negative_ts', 'make_zero',
         '-movflags', '+faststart',
         dst
     ]
     r = subprocess.run(cmd, capture_output=True)
     if r.returncode != 0:
-        print(f"[FFMPEG_ERR] {r.stderr.decode()[-500:]}")
+        print(f"[FFMPEG_ERR] {r.stderr.decode()[-600:]}")
     return r.returncode == 0 and os.path.exists(dst)
 
 
