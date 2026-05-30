@@ -15,7 +15,7 @@ image = (
     .pip_install("requests", "numpy")
     .pip_install("mediapipe==0.10.9", "opencv-python-headless")
     .run_commands(
-        "echo 'rebuild-v9-ultrafast'",
+        "echo 'rebuild-v17-zoom-fix'",
         "mkdir -p /usr/share/fonts/poppins",
         "wget -q -O /usr/share/fonts/poppins/Poppins-ExtraBold.ttf "
         "'https://github.com/google/fonts/raw/main/ofl/poppins/Poppins-ExtraBold.ttf'",
@@ -232,7 +232,8 @@ def build_zoom_filter(zoom_factor, face_center=None):
     x = x & ~1
     y = y & ~1
 
-    return f'crop={w}:{h}:{x}:{y},scale={TARGET_W}:{TARGET_H}:flags=lanczos,format=yuv420p'
+    # Scale para TARGET antes do crop para garantir dimensoes corretas
+    return f'scale={TARGET_W}:{TARGET_H}:flags=lanczos,crop={w}:{h}:{x}:{y},scale={TARGET_W}:{TARGET_H}:flags=lanczos,format=yuv420p'
 
 
 def normalize_segment(src, dst, trim_start, duration,
