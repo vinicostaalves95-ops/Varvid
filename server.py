@@ -233,7 +233,7 @@ def generate():
 
     def run_modal():
         try:
-            modal_fn("process_job_http_v17").remote(
+            modal_fn("process_job_http").remote(
                 job_id, file_urls, output_base_url, count,
                 headline_text=headline_text,
                 headline_duration=headline_duration
