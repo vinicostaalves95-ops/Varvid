@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VarVid — Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--accent:#E8FF47;--bg:#080808;--bg2:#0e0e0e;--bg3:#111;--border:#1e1e1e;--border2:#2a2a2a;
+  --text:#fff;--muted:#aaa;--dim:#555;--hook:#E8FF47;--story:#60A5FA;--rev:#FB923C;--prova:#4ADE80;--cta:#F472B6;--err:#F87171}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-size:14px}
+body{opacity:0;transition:opacity .2s}
+body.ready{opacity:1}
+.gate{position:fixed;inset:0;display:grid;place-items:center;background:var(--bg);z-index:50}
+.gate .sp{width:26px;height:26px;border:3px solid #222;border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.topbar{height:52px;border-bottom:2px solid #333;padding:0 22px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;background:var(--bg)}
+.app{display:grid;grid-template-columns:340px 1fr;height:calc(100vh - 52px)}
+.left{border-right:2px solid #333;display:flex;flex-direction:column;overflow-y:auto}
+.right{display:flex;flex-direction:column;background:#060606;overflow-y:auto}
+.head-l{display:flex;align-items:center;gap:8px}
+.logo-ic{width:24px;height:24px;background:var(--accent);border-radius:7px;display:grid;place-items:center}
+.logo-nm{font-family:'Syne',sans-serif;font-size:17px;font-weight:800;letter-spacing:-.02em}
+.ver{font-size:10px;color:#888;background:#111;border:1px solid #333;padding:2px 8px;border-radius:20px}
+.user{display:none;align-items:center;gap:10px}
+.user .credits{font-size:11px;font-weight:700;color:#000;background:var(--accent);border-radius:20px;padding:4px 11px;align-items:center;gap:5px}
+.user .em{font-size:12px;color:var(--muted);max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.user .out{font-size:11px;color:#888;background:#111;border:1px solid var(--border2);border-radius:8px;padding:5px 10px;cursor:pointer}
+.user .out:hover{color:#fff;border-color:#444}
+.user .planos-btn{font-size:11px;font-weight:700;color:var(--accent);background:transparent;border:1px solid rgba(232,255,71,.4);border-radius:8px;padding:6px 12px;cursor:pointer}
+.user .planos-btn:hover{background:rgba(232,255,71,.08)}
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.8);display:none;align-items:center;justify-content:center;z-index:80;padding:16px}
+.modal-bg.show{display:flex}
+.modal{background:#111;border:1px solid var(--border2);border-radius:18px;width:100%;max-width:520px;padding:22px}
+.modal-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+.modal-title{font-family:'Syne',sans-serif;font-size:19px;font-weight:800}
+.modal-x{width:28px;height:28px;border-radius:50%;background:#1a1a1c;border:1px solid var(--border2);color:#999;cursor:pointer;font-size:13px}
+.modal-sub{font-size:12px;color:var(--muted);margin-bottom:18px}
+.plan-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.plan-card{background:#0d0d0e;border:1px solid var(--border2);border-radius:14px;padding:16px}
+.plan-card.current{border-color:rgba(232,255,71,.5)}
+.plan-name{font-family:'Syne',sans-serif;font-size:16px;font-weight:800;margin-bottom:2px;display:flex;align-items:center}
+.plan-tag{font-size:9px;color:#000;background:var(--accent);border-radius:6px;padding:2px 7px;font-weight:700;margin-left:6px}
+.plan-credits{font-size:12px;color:var(--muted);margin-bottom:14px}
+.plan-credits b{color:var(--accent)}
+.plan-btn{width:100%;height:40px;border-radius:9px;border:none;background:var(--accent);color:#000;font-weight:800;font-size:13px;cursor:pointer;font-family:'Syne',sans-serif}
+.plan-btn:disabled{opacity:.4;cursor:default}
+.modal-note{font-size:11px;color:var(--dim);text-align:center;margin-top:16px}
+
+.mode-wrap{padding:16px 16px 4px}
+.mode-tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;background:#0c0c0c;border:1px solid var(--border2);border-radius:12px;padding:5px}
+.mtab{height:38px;border:none;border-radius:8px;background:transparent;color:#777;font-family:'Syne',sans-serif;font-size:12.5px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px}
+.mtab.active{background:var(--accent);color:#000}
+.mtab svg{width:14px;height:14px}
+
+.sec{padding:16px;border-bottom:1px solid var(--border2)}
+.sec-label{display:flex;align-items:center;gap:10px;font-size:10px;color:#bbb;letter-spacing:.14em;text-transform:uppercase;font-weight:600;margin-bottom:8px}
+.sec-label::before{content:attr(data-step);display:grid;place-items:center;width:22px;height:22px;border-radius:50%;border:1.5px solid rgba(232,255,71,.35);background:rgba(232,255,71,.06);color:#E8FF47;font-size:10px;font-weight:700;font-family:'Syne',sans-serif}
+.intro{font-size:12px;color:var(--muted);line-height:1.5;margin:0 0 14px 32px}
+.intro b{color:#fff;font-weight:500}
+
+.collapse-hdr{display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none}
+.chev{width:16px;height:16px;color:#666;transition:transform .2s;flex-shrink:0}
+.collapse-hdr.open .chev{transform:rotate(180deg)}
+.collapse-body{display:none;margin-top:14px}
+.collapse-body.open{display:block}
+.grp{margin-bottom:14px}
+.grp-h{display:flex;align-items:baseline;gap:8px;margin-bottom:8px}
+.grp-name{font-size:12px;font-weight:700;color:#e8e8e8}
+.grp-sub{font-size:10.5px;color:var(--dim)}
+.grp-box{background:#0d0d0e;border:1px solid var(--border);border-radius:12px;padding:6px;display:flex;flex-direction:column;gap:2px}
+.ng-row{display:flex;align-items:center;gap:11px;padding:9px 11px;border-radius:9px}
+.ng-name{font-size:12.5px;font-weight:600;line-height:1.15;color:#fff}
+.ng-desc{font-size:10.5px;color:var(--dim);margin-top:2px}
+.ng-file{margin-left:auto;font-family:ui-monospace,monospace;font-size:11px;color:#bbb;background:#000;border:1px solid var(--border2);border-radius:6px;padding:5px 9px;flex-shrink:0}
+.grp-note{font-size:10.5px;color:var(--muted);margin:8px 4px 0;line-height:1.5}
+.grp-note code{font-family:ui-monospace,monospace;color:var(--accent);font-size:10.5px}
+.ng-tip{display:flex;gap:8px;align-items:flex-start;margin-top:6px;padding:10px 11px;background:#0d0d0f;border:1px solid var(--border);border-radius:10px;font-size:11px;color:var(--muted);line-height:1.5}
+.ng-tip svg{width:15px;height:15px;color:#888;flex-shrink:0;margin-top:1px}
+.ng-tip code{font-family:ui-monospace,monospace;color:#ddd;font-size:10.5px}
+
+.drop{border:1px dashed #333;border-radius:14px;padding:22px 16px;text-align:center;background:var(--bg2);cursor:pointer;position:relative}
+.drop.over{border-color:var(--accent)}
+.drop input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.drop-ic{width:42px;height:42px;background:#111;border:1px solid #2a2a2a;border-radius:12px;display:grid;place-items:center;margin:0 auto 10px}
+.drop-main{font-size:13px;color:#ddd}
+.drop-sub{font-size:11px;color:var(--dim);margin-top:3px}
+.badge{display:none;margin-top:10px;padding:5px 14px;background:#E8FF4712;border:1px solid #E8FF4740;border-radius:20px;font-size:11px;color:var(--accent)}
+.badge.show{display:inline-flex;align-items:center;gap:6px}
+.spin{width:12px;height:12px;border:2px solid #333;border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;display:inline-block;vertical-align:middle}
+
+.var-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.var-btn{height:42px;background:var(--bg2);border:1px solid #2a2a2a;color:#666;font-family:'Syne',sans-serif;font-size:15px;font-weight:700;border-radius:10px;cursor:pointer}
+.var-btn.active{background:var(--accent);border-color:var(--accent);color:#000}
+.hl-row{display:flex;gap:8px;height:92px}
+.hl-ta{flex:1;background:#0e0e0e;border:1px solid #2a2a2a;border-radius:8px;padding:10px 12px;color:#fff;font-size:12px;resize:none;outline:none;font-family:'Inter'}
+.hl-ta:focus{border-color:var(--accent)}.hl-ta::placeholder{color:#555}
+.hl-dur{width:76px;background:#0e0e0e;border:1px solid #2a2a2a;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:10px 6px}
+.hl-dur .l{font-size:9px;color:#ccc;text-align:center;line-height:1.3}
+.hl-dur input{width:100%;background:transparent;border:none;color:#fff;font-family:'Syne',sans-serif;font-size:24px;font-weight:800;text-align:center;outline:none;-moz-appearance:textfield}
+.hl-dur input::-webkit-outer-spin-button,.hl-dur input::-webkit-inner-spin-button{-webkit-appearance:none}
+.hl-dur .u{font-size:9px;color:#444}
+
+.gen-wrap{padding:16px;margin-top:auto;border-top:2px solid #333;flex-shrink:0}
+.btn-gen{width:100%;height:48px;border-radius:8px;border:none;background:var(--accent);color:#000;font-family:'Syne',sans-serif;font-size:15px;font-weight:800;letter-spacing:.06em;cursor:pointer}
+.btn-gen:disabled{opacity:.35;cursor:not-allowed}
+
+.rpanel{padding:16px;border-bottom:1px solid var(--border2)}
+.rlabel{font-size:10px;color:#aaa;letter-spacing:.12em;text-transform:uppercase;margin-bottom:12px}
+.mx-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+.mx-card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:10px}
+.mx-card-label{font-size:9px;color:#666;letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px}
+.mx-row{display:flex;align-items:center;justify-content:space-between;padding:8px;border-radius:8px;margin-bottom:5px;border:1px solid}
+.mx-row.on{background:#E8FF470a;border-color:#E8FF4730}
+.mx-row.soon{background:#0e0e0e;border-color:#1e1e1e;opacity:.6}
+.mx-rname{font-size:11px;font-weight:500}
+.mx-rsub{font-size:9px;color:#555;margin-top:1px}
+.mx-tag{font-size:9px;padding:2px 8px;border-radius:8px;background:#0e0e0e;color:#555;border:1px solid #1e1e1e}
+.mx-tag.acc{background:#E8FF4712;color:var(--accent);border-color:#E8FF4740}
+.combo-bar{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:14px;display:flex;align-items:center;justify-content:space-between}
+.combo-num{font-family:'Syne',sans-serif;font-size:32px;font-weight:800;color:var(--accent);line-height:1}
+.combo-label{font-size:11px;color:#ccc;margin-top:2px}
+.combo-formula{font-size:10px;color:var(--dim);margin-top:2px}
+.combo-disc{font-size:9px;color:#444;margin-top:6px;font-style:italic;max-width:340px}
+
+.prog{padding:16px;border-bottom:1px solid var(--border2);display:none}
+.prog.show{display:block}
+.prog-top{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:8px}
+.prog-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em}
+.prog-frac{font-family:'Syne',sans-serif;font-size:14px;color:var(--accent)}
+.track{height:4px;background:#1a1a1a;border-radius:2px;overflow:hidden}
+.fill{height:100%;background:var(--accent);width:0;transition:width .4s}
+
+.results{padding:16px;display:none}
+.results.show{display:block}
+.results-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.results-count{font-family:'Syne',sans-serif;font-size:15px;font-weight:700;color:#4ADE80}
+.btn-all{font-size:11px;color:#000;background:var(--accent);border:none;border-radius:8px;padding:7px 14px;font-weight:700;cursor:pointer}
+.results-warn{font-size:11.5px;color:#FBBF24;background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.32);border-radius:9px;padding:9px 12px;margin-bottom:12px;line-height:1.5}
+.res-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.res{background:#0e0e0e;border:1px solid var(--border2);border-radius:10px;padding:10px 12px;display:flex;align-items:center;gap:10px}
+.res .n{flex:1;font-size:12px;font-weight:600}
+.res .b{color:var(--accent);cursor:pointer;font-size:12px;border:1px solid #E8FF4740;border-radius:7px;padding:5px 9px;background:transparent}
+.empty{flex:1;display:flex;align-items:center;justify-content:center;padding:2rem}
+.empty-tx{font-size:11px;color:#333;text-align:center;line-height:2.2}
+.toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:#1a1a1c;border:1px solid var(--border2);color:#eee;font-size:12.5px;padding:10px 16px;border-radius:10px;display:none;z-index:60;cursor:pointer;max-width:90vw}
+.toast.show{display:block}
+.toast.err{border-color:rgba(248,113,113,.4);color:#fca5a5}
+</style></head>
+<body>
+<div class="gate" id="gate"><div class="sp"></div></div>
+
+<div class="topbar">
+  <div class="head-l">
+    <div class="logo-ic"><svg viewBox="0 0 15 15" fill="none" width="14" height="14"><rect x="1" y="1" width="5.5" height="5.5" rx="1.5" fill="#000"/><rect x="8.5" y="1" width="5.5" height="5.5" rx="1.5" fill="#000" opacity=".6"/><rect x="1" y="8.5" width="5.5" height="5.5" rx="1.5" fill="#000" opacity=".6"/><rect x="8.5" y="8.5" width="5.5" height="5.5" rx="1.5" fill="#000" opacity=".25"/></svg></div>
+    <span class="logo-nm">VarVid</span><span class="ver">v6.0</span>
+  </div>
+  <div class="user" id="userWrap"><button class="planos-btn" id="planosBtn" style="display:none" onclick="openPlans()">Planos</button><span class="credits" id="creditsPill" style="display:none">—</span><span class="em" id="userEmail"></span><button class="out" onclick="logout()">Sair</button></div>
+</div>
+
+<div class="app">
+  <div class="left">
+    <div class="mode-wrap">
+      <div class="mode-tabs">
+        <button class="mtab active" id="tab-remix" onclick="setMode('remix')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg> Remix de takes</button>
+        <button class="mtab" id="tab-single" onclick="setMode('single')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg> Vídeo único</button>
+      </div>
+    </div>
+
+    <!-- REMIX: guia de nomes -->
+    <div class="sec" id="naming-sec">
+      <div class="collapse-hdr" id="naming-hdr" onclick="toggleNaming()">
+        <div class="sec-label" data-step="1" style="margin-bottom:0">Leia antes de subir os takes</div>
+        <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+      </div>
+      <div class="collapse-body" id="naming-body">
+        <div class="intro">Dê a cada arquivo o nome do seu <b>bloco</b>. É assim que o VarVid monta as combinações:</div>
+        <div class="grp">
+          <div class="grp-h"><span class="grp-name">Misturados</span><span class="grp-sub">giram pra gerar variações</span></div>
+          <div class="grp-box">
+            <div class="ng-row"><div class="ng-txt"><div class="ng-name">Hook</div><div class="ng-desc">o gancho que prende</div></div><div class="ng-file">Hook1.mp4</div></div>
+            <div class="ng-row"><div class="ng-txt"><div class="ng-name">CTA</div><div class="ng-desc">a chamada pra agir</div></div><div class="ng-file">CTA1.mp4</div></div>
+          </div>
+          <div class="grp-note">Grave 2 ou mais de cada e numere (<code>Hook1</code>, <code>Hook2</code>) pra multiplicar as versões.</div>
+        </div>
+        <div class="grp">
+          <div class="grp-h"><span class="grp-name">Mantidos</span><span class="grp-sub">ficam iguais em todos</span></div>
+          <div class="grp-box">
+            <div class="ng-row"><div class="ng-txt"><div class="ng-name">Story</div><div class="ng-desc">a história / contexto</div></div><div class="ng-file">Story.mp4</div></div>
+            <div class="ng-row"><div class="ng-txt"><div class="ng-name">Revelação</div><div class="ng-desc">a virada</div></div><div class="ng-file">Revelacao.mp4</div></div>
+            <div class="ng-row"><div class="ng-txt"><div class="ng-name">Prova</div><div class="ng-desc">resultado / prova social</div></div><div class="ng-file">Prova.mp4</div></div>
+          </div>
+        </div>
+        <div class="ng-tip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 3v18M18 3v18M6 12h12M9 8h6M9 16h6"/></svg><div>Bloco muito longo? Quebre em partes com <code>_pt1</code>, <code>_pt2</code> — vale pra qualquer bloco, inclusive hooks e CTAs (ex.: <code>Hook1_pt1</code>, <code>Hook1_pt2</code>). Ele junta na ordem certa.</div></div>
+      </div>
+    </div>
+
+    <!-- upload (compartilhado) -->
+    <div class="sec">
+      <div class="sec-label" data-step="2" id="upload-label">Seus takes</div>
+      <div class="drop" id="drop">
+        <input type="file" id="file" accept="video/*,.mov,.mp4,.MOV,.MP4" multiple>
+        <div class="drop-ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#E8FF47" stroke-width="1.5" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>
+        <div class="drop-main" id="drop-main">Arraste seus takes aqui</div>
+        <div class="drop-sub" id="drop-sub">ou clique para selecionar</div>
+        <div class="badge" id="badge">✦ <span id="fcount">0</span> arquivo(s)</div>
+      </div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-label" data-step="3">Quantas variações</div>
+      <div class="var-grid" id="vargrid">
+        <button class="var-btn active" data-n="5">5</button><button class="var-btn" data-n="10">10</button><button class="var-btn" data-n="15">15</button>
+        <button class="var-btn" data-n="20">20</button><button class="var-btn" data-n="25">25</button><button class="var-btn" data-n="30">30</button>
+      </div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-label" data-step="4">Headline no vídeo</div>
+      <div class="hl-row">
+        <textarea class="hl-ta" id="hl" maxlength="80" placeholder="Texto do headline... (vazio = sem texto)"></textarea>
+        <div class="hl-dur"><div class="l">Defina a<br>duração</div><input type="number" id="hd" value="3" min="1" max="15"><div class="u">segundos</div></div>
+      </div>
+    </div>
+
+    <div class="gen-wrap"><button class="btn-gen" id="go" disabled>▶ GERAR VARIAÇÕES</button></div>
+  </div>
+
+  <div class="right">
+    <!-- REMIX: estrutura detectada -->
+    <div class="rpanel" id="remix-right" style="display:none">
+      <div class="rlabel">Estrutura detectada</div>
+      <div class="mx-grid">
+        <div class="mx-card"><div class="mx-card-label">Blocos que variam</div><div id="vary-blocks"><div style="font-size:11px;color:#333;padding:6px 0">envie os takes…</div></div></div>
+        <div class="mx-card"><div class="mx-card-label">Blocos fixos</div><div id="fixed-blocks"><div style="font-size:11px;color:#333;padding:6px 0">—</div></div></div>
+      </div>
+      <div class="combo-bar">
+        <div><div class="combo-num" id="combo-num">—</div><div class="combo-label">combinações de takes possíveis</div><div class="combo-formula" id="combo-formula"></div>
+          <div class="combo-disc">Depois de esgotar as combinações, o VarVid aplica micro-cortes e zoom pra continuar gerando vídeos únicos.</div></div>
+        <svg width="44" height="44" viewBox="0 0 44 44" fill="none"><rect x="2" y="2" width="18" height="18" rx="4" fill="#E8FF47" opacity="0.9"/><rect x="24" y="2" width="18" height="18" rx="4" fill="#E8FF47" opacity="0.5"/><rect x="2" y="24" width="18" height="18" rx="4" fill="#E8FF47" opacity="0.5"/><rect x="24" y="24" width="18" height="18" rx="4" fill="#E8FF47" opacity="0.2"/></svg>
+      </div>
+    </div>
+
+    <!-- SINGLE: ajustes aplicados -->
+    <div class="rpanel" id="single-right" style="display:none">
+      <div class="rlabel">Ajustes aplicados em cada vídeo</div>
+      <div class="mx-grid">
+        <div class="mx-card"><div class="mx-card-label">Ativos</div>
+          <div class="mx-row on"><div><div class="mx-rname" style="color:var(--accent)">Micro-cortes</div><div class="mx-rsub">1–4 quadros início · 1–3 fim</div></div><span class="mx-tag acc">on</span></div>
+          <div class="mx-row on"><div><div class="mx-rname" style="color:var(--accent)">Zoom sutil</div><div class="mx-rsub">reenquadra 1.02×–1.06×</div></div><span class="mx-tag acc">on</span></div>
+        </div>
+        <div class="mx-card"><div class="mx-card-label">Em breve</div>
+          <div class="mx-row soon"><div><div class="mx-rname" style="color:#888">Variação de cor</div><div class="mx-rsub">brilho · saturação</div></div><span class="mx-tag">soon</span></div>
+          <div class="mx-row soon"><div><div class="mx-rname" style="color:#888">Pitch de áudio</div><div class="mx-rsub">micro ajuste de tom</div></div><span class="mx-tag">soon</span></div>
+        </div>
+      </div>
+      <div class="combo-bar">
+        <div><div class="combo-num" id="single-count">—</div><div class="combo-label">variações únicas do seu vídeo</div>
+          <div class="combo-disc">Todas visualmente iguais, mas com fingerprint distinto — arquivos, durações e enquadramento levemente diferentes.</div></div>
+        <svg width="44" height="44" viewBox="0 0 44 44" fill="none"><rect x="2" y="2" width="18" height="18" rx="4" fill="#E8FF47" opacity="0.9"/><rect x="24" y="2" width="18" height="18" rx="4" fill="#E8FF47" opacity="0.5"/><rect x="2" y="24" width="18" height="18" rx="4" fill="#E8FF47" opacity="0.5"/><rect x="24" y="24" width="18" height="18" rx="4" fill="#E8FF47" opacity="0.2"/></svg>
+      </div>
+    </div>
+
+    <div class="prog" id="prog">
+      <div class="prog-top"><div class="prog-label" id="prog-label">Renderizando…</div><div class="prog-frac"><span id="p-done">0</span> / <span id="p-total">—</span></div></div>
+      <div class="track"><div class="fill" id="fill"></div></div>
+    </div>
+
+    <div class="results" id="results">
+      <div class="results-head"><div class="results-count" id="results-count">0 vídeos prontos</div><button class="btn-all" onclick="downloadAll()">⬇ Baixar todos</button></div>
+      <div class="results-warn">⚠️ Baixe seus vídeos agora para não perdê-los — eles ficam disponíveis apenas por um tempo.</div>
+      <div class="res-grid" id="res-grid"></div>
+    </div>
+
+    <div class="empty" id="empty"><div class="empty-tx">01 — envie seus vídeos<br>02 — escolha quantas variações<br>03 — headline (opcional)<br>04 — gera e baixa tudo</div></div>
+  </div>
+</div>
+
+<div class="modal-bg" id="plansModal">
+  <div class="modal">
+    <div class="modal-top"><div class="modal-title">Escolha seu plano</div><button class="modal-x" onclick="closePlans()">✕</button></div>
+    <div class="modal-sub" id="plansCurrent"></div>
+    <div class="plan-grid" id="planGrid"></div>
+    <div class="modal-note">Pagamento seguro via Stripe · cancele quando quiser.</div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+let cfg=null, sb=null, TOKEN=null;
+let mode='remix', count=5, selectedFiles=[], jobId=null, poll=null, results=[];
+const $=id=>document.getElementById(id);
+let _toastTimer=null;
+function toast(t,err,ms){
+  const e=$('toast');
+  e.className='toast show'+(err?' err':'');
+  e.textContent=t;
+  e.onclick=()=>{ e.className='toast'; if(_toastTimer){clearTimeout(_toastTimer);_toastTimer=null;} };
+  if(_toastTimer){ clearTimeout(_toastTimer); _toastTimer=null; }
+  if(ms!==0){ _toastTimer=setTimeout(()=>{ e.className='toast'; }, ms||4500); }
+}
+
+async function boot(){
+  try{ cfg = await (await fetch('/auth-config.json')).json(); }catch(e){ cfg={authEnabled:false}; }
+  if(cfg.authEnabled){
+    if(typeof supabase==='undefined'){
+      $('gate').innerHTML='<div style="text-align:center;color:#aaa;font-size:14px;max-width:340px;line-height:1.6">Não consegui carregar a biblioteca de login.<br>Verifique sua internet e recarregue a página.</div>';
+      return;
+    }
+    sb = supabase.createClient(cfg.url, cfg.anonKey);
+    const {data:{session}} = await sb.auth.getSession();
+    if(!session){ location.href='/login'; return; }
+    TOKEN = session.access_token;
+    sb.auth.onAuthStateChange((_e, s)=>{ if(s && s.access_token) TOKEN = s.access_token; });
+    $('userEmail').textContent = session.user.email || '';
+    $('userWrap').style.display='flex';
+    refreshMe(); loadBilling();
+  }
+  wire();
+  setMode(location.pathname==='/single' ? 'single' : 'remix');
+  $('gate').style.display='none';
+  document.body.classList.add('ready');
+  $('plansModal').addEventListener('click', e=>{ if(e.target.id==='plansModal') closePlans(); });
+  const q=new URLSearchParams(location.search);
+  if(q.get('assinatura')==='ok'){ toast('✓ Assinatura ativada! Seus créditos foram atualizados. (toque para fechar)', false, 0); setTimeout(refreshMe,800); }
+  else if(q.get('assinatura')==='cancelada'){ toast('Assinatura cancelada — nada foi cobrado.'); }
+  else if(q.get('assinatura')==='erro'){ toast('Não consegui ativar a assinatura. Tente de novo ou me avise.',true); }
+  if(q.get('assinatura')){ history.replaceState({}, '', location.pathname); }
+  restoreLastJob();
+}
+function authHeaders(extra){const h=Object.assign({},extra||{});if(TOKEN)h['Authorization']='Bearer '+TOKEN;return h;}
+async function api(url,opts){opts=opts||{};opts.headers=authHeaders(opts.headers);return fetch(url,opts);}
+async function logout(){ if(sb) await sb.auth.signOut(); location.href='/login'; }
+async function refreshMe(){
+  try{
+    const d=await (await api('/me')).json();
+    if(d.email) $('userEmail').textContent=d.email;
+    const pill=$('creditsPill');
+    if(d.creditsEnabled && d.credits!=null){ pill.style.display='inline-flex'; pill.textContent='✦ '+d.credits+' créditos'; }
+    else { pill.style.display='none'; }
+  }catch(e){}
+}
+let PLANS_DATA=null;
+async function loadBilling(){
+  try{
+    const d=await (await api('/billing/plans')).json(); PLANS_DATA=d;
+    if(d.stripeEnabled && d.plans && d.plans.length) $('planosBtn').style.display='inline-flex';
+  }catch(e){}
+}
+function openPlans(){
+  if(!PLANS_DATA) return;
+  $('plansCurrent').textContent='Seu plano atual: '+(PLANS_DATA.currentPlan||'free');
+  $('planGrid').innerHTML=PLANS_DATA.plans.map(p=>{
+    const cur=p.key===PLANS_DATA.currentPlan;
+    return '<div class="plan-card'+(cur?' current':'')+'"><div class="plan-name">'+p.label+(cur?'<span class="plan-tag">atual</span>':'')+'</div>'
+      +'<div class="plan-credits"><b>'+p.credits+'</b> vídeos por mês</div>'
+      +'<button class="plan-btn"'+(cur?' disabled':'')+' onclick="subscribe(\''+p.key+'\')">'+(cur?'Plano atual':'Assinar')+'</button></div>';
+  }).join('');
+  $('plansModal').classList.add('show');
+}
+function closePlans(){ $('plansModal').classList.remove('show'); }
+async function subscribe(key){
+  try{
+    const r=await api('/billing/checkout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({plan:key})});
+    const d=await r.json();
+    if(d.url){ window.location.href=d.url; } else { toast('Erro ao iniciar o checkout: '+(d.error||''),true); }
+  }catch(e){ toast('Falha no checkout: '+e.message,true); }
+}
+
+function setMode(m){
+  mode=m; resetJob();
+  const single = m==='single';
+  $('tab-single').classList.toggle('active',single);
+  $('tab-remix').classList.toggle('active',!single);
+  $('naming-sec').style.display = single?'none':'block';
+  $('upload-label').textContent = single?'Seu vídeo':'Seus takes';
+  $('drop-main').textContent = single?'Arraste 1 vídeo pronto':'Arraste seus takes aqui';
+  $('drop-sub').textContent = single?'.mp4 · .mov — ou vários pra gerar em lote':'ou clique para selecionar';
+  $('remix-right').style.display = single?'none':'block';
+  $('single-right').style.display = single?'block':'none';
+  selectedFiles=[]; $('file').value=''; $('badge').className='badge'; $('go').disabled=true;
+  showEmpty(true);
+}
+function resetJob(){ if(poll){clearInterval(poll);poll=null;} jobId=null; results=[]; $('prog').className='prog'; $('results').className='results'; }
+function showEmpty(v){ $('empty').style.display = v?'flex':'none'; }
+function toggleNaming(){ $('naming-hdr').classList.toggle('open'); $('naming-body').classList.toggle('open'); }
+
+function wire(){
+  const drop=$('drop'), file=$('file');
+  ['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('over');}));
+  ['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('over');}));
+  drop.addEventListener('drop',e=>onFiles(e.dataTransfer.files));
+  file.addEventListener('change',e=>onFiles(e.target.files));
+  $('vargrid').addEventListener('click',e=>{ if(!e.target.dataset.n)return; count=parseInt(e.target.dataset.n);
+    document.querySelectorAll('.var-btn').forEach(b=>b.classList.toggle('active',b===e.target)); });
+  $('go').addEventListener('click',generate);
+}
+
+function onFiles(fl){
+  const exts=['.mp4','.mov','.avi','.mkv','.webm'];
+  selectedFiles=Array.from(fl).filter(f=>exts.some(x=>f.name.toLowerCase().endsWith(x)));
+  $('fcount').textContent=selectedFiles.length;
+  $('badge').className = selectedFiles.length?'badge show':'badge';
+  if(!selectedFiles.length){ $('go').disabled=true; return; }
+  if(mode==='remix'){ analyze(); }
+  else { $('go').disabled=false; showEmpty(false); }
+}
+
+async function analyze(){
+  $('go').disabled=true;
+  $('badge').innerHTML='<span class="spin"></span> analisando…'; $('badge').className='badge show';
+  const fd=new FormData(); selectedFiles.forEach(f=>fd.append('files',f,f.name));
+  try{
+    const r=await api('/analyze',{method:'POST',body:fd});
+    const d=await r.json();
+    if(d.error){ toast('Erro ao analisar: '+d.error,true); $('badge').className='badge'; return; }
+    jobId=d.job_id;
+    renderStructure(d.summary||{}, d.max_combinations||1);
+    $('badge').innerHTML='✦ '+selectedFiles.length+' arquivo(s)'; $('badge').className='badge show';
+    $('go').disabled=false; showEmpty(false);
+  }catch(e){ toast('Falha na análise: '+e.message,true); $('badge').className='badge'; }
+}
+
+const BLOCK_ORDER=['hook','story','revelacao','prova','cta'];
+const SWAP=new Set(['hook','cta']);
+const BCOLOR={hook:'var(--hook)',story:'var(--story)',revelacao:'var(--rev)',prova:'var(--prova)',cta:'var(--cta)'};
+function cap(s){return s.charAt(0).toUpperCase()+s.slice(1);}
+function renderStructure(summary,maxCombos){
+  const vary=$('vary-blocks'), fixed=$('fixed-blocks'); vary.innerHTML=''; fixed.innerHTML='';
+  let parts=[];
+  BLOCK_ORDER.forEach(b=>{
+    if(!summary[b])return;
+    const n=summary[b].length, takes=summary[b].reduce((a,v)=>a+v.parts,0);
+    if(SWAP.has(b)){
+      vary.insertAdjacentHTML('beforeend',`<div class="mx-row on"><div><div class="mx-rname">${cap(b)}</div><div class="mx-rsub">${takes} take(s)</div></div><span class="mx-tag acc">${n}</span></div>`);
+      if(n>1)parts.push(n+' '+b);
+    }else{
+      fixed.insertAdjacentHTML('beforeend',`<div class="mx-row soon"><div><div class="mx-rname" style="color:#888">${cap(b)}</div><div class="mx-rsub">${takes} take(s)</div></div><span class="mx-tag">fixo</span></div>`);
+    }
+  });
+  if(!vary.innerHTML)vary.innerHTML='<div style="font-size:11px;color:#333;padding:6px 0">nenhum hook/cta</div>';
+  if(!fixed.innerHTML)fixed.innerHTML='<div style="font-size:11px;color:#333;padding:6px 0">—</div>';
+  $('combo-num').textContent=maxCombos;
+  $('combo-formula').textContent = parts.length? parts.join(' × ')+' = '+maxCombos+' combos' : 'estrutura linear';
+}
+
+async function generate(){
+  if(!selectedFiles.length)return;
+  $('go').disabled=true; $('go').textContent='GERANDO…';
+  results=[]; renderResults(); showEmpty(false);
+  const headline=$('hl').value.trim(), hd=parseInt($('hd').value||'3')||3;
+  try{
+    if(mode==='single'){
+      $('single-count').textContent=count;
+      const fd=new FormData(); selectedFiles.forEach(f=>fd.append('files',f,f.name));
+      fd.append('count',count); fd.append('headline_text',headline); fd.append('headline_duration',hd);
+      const r=await api('/single/generate',{method:'POST',body:fd});
+      const d=await r.json(); if(d.error){ toast(errText(d),true); resetBtn(); return; }
+      jobId=d.job_id;
+    }else{
+      if(!jobId){ toast('Envie os takes primeiro.',true); resetBtn(); return; }
+      const r=await api('/generate',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({job_id:jobId,count,headline_text:headline,headline_duration:hd})});
+      const d=await r.json(); if(d.error){ toast(errText(d),true); resetBtn(); return; }
+    }
+    startPolling();
+  }catch(e){ toast('Falha ao gerar: '+e.message,true); resetBtn(); }
+}
+function resetBtn(){ $('go').disabled=false; $('go').textContent='▶ GERAR VARIAÇÕES'; }
+function errText(d){ if(d.error==='sem_creditos'){ return 'Créditos insuficientes'+(d.credits!=null?' ('+d.credits+' restantes)':'')+'. Reduza a quantidade ou faça upgrade do plano.'; } return 'Erro: '+d.error; }
+
+function startPolling(){
+  $('prog').className='prog show'; $('p-total').textContent=count; $('p-done').textContent=0; $('fill').style.width='0%';
+  poll=setInterval(async()=>{
+    try{
+      const st=await (await api('/status/'+jobId)).json();
+      const done=st.completed||0;
+      $('p-done').textContent=done; $('fill').style.width=(st.progress||0)+'%';
+      $('prog-label').textContent = st.status==='done'?'Concluído':'Renderizando…';
+      if((st.files||[]).length!==results.length){ results=st.files||[]; renderResults(); }
+      if(st.status==='done'||st.status==='error'){
+        clearInterval(poll); poll=null; resetBtn(); refreshMe();
+        if(st.status==='error') toast('Erro no render: '+(st.error||''),true);
+      }
+    }catch(e){/* ignora blips de rede */}
+  },1500);
+}
+
+function renderResults(){
+  const grid=$('res-grid');
+  if(!results.length){ $('results').className='results'; return; }
+  $('results').className='results show';
+  $('results-count').textContent=results.length+' vídeo(s) pronto(s)';
+  grid.innerHTML=results.map((f,i)=>`<div class="res"><div class="n">Variação ${String(i+1).padStart(2,'0')}</div><button class="b" onclick="dl('${f}')">⬇</button></div>`).join('');
+  saveLastJob();
+}
+async function dl(f){
+  try{
+    const r=await api('/download/'+jobId+'/'+f);
+    if(!r.ok){ toast('Não consegui baixar '+f,true); return; }
+    const b=await r.blob(); const u=URL.createObjectURL(b);
+    const a=document.createElement('a'); a.href=u; a.download=f; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(u),4000);
+  }catch(e){ toast('Falha no download: '+e.message,true); }
+}
+async function downloadAll(){ for(const f of results){ await dl(f); await new Promise(r=>setTimeout(r,400)); } }
+
+// Lembra a última geração pra sobreviver a um reload sem querer
+function saveLastJob(){ try{ if(jobId) localStorage.setItem('varvid_last_job', JSON.stringify({jobId:jobId, ts:Date.now()})); }catch(e){} }
+async function restoreLastJob(){
+  let saved=null; try{ saved=JSON.parse(localStorage.getItem('varvid_last_job')||'null'); }catch(e){}
+  if(!saved || !saved.jobId) return;
+  try{
+    const st=await (await api('/status/'+saved.jobId)).json();
+    const files=st.files||[];
+    if(st.status==='not_found' || (!files.length && st.status!=='rendering')){ localStorage.removeItem('varvid_last_job'); return; }
+    jobId=saved.jobId; results=files; renderResults(); showEmpty(false);
+    if(st.status==='rendering'){ startPolling(); }   // retoma se ainda estava gerando
+  }catch(e){}
+}
+
+boot();
+</script>
+</body></html>

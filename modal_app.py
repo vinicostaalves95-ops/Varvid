@@ -1,44 +1,96 @@
-import modal
-import os
-import json
-import uuid
-import random
-import re
-import shutil
-import subprocess
-from pathlib import Path
-from itertools import product as iterproduct
+"""
+VarVid — função de RENDER no Modal (produção)
 
+O app web (local_app.py, no modo RENDER_BACKEND=modal, hospedado no Render)
+despacha os jobs pra cá. Esta função:
+  1. baixa os takes das URLs recebidas (RENDER_URL/files/<job>/<nome>),
+  2. renderiza as variações (mesma lógica da versão local — remix de blocos
+     OU modo vídeo único), e
+  3. devolve cada vídeo pronto via PUT em RENDER_URL/output/<job>/<arquivo>,
+     mais o takes_map e um marcador _done em RENDER_URL/output/<job>/meta/...
+
+Deploy:  modal deploy modal_app.py
+O nome do app ("varvid") tem que bater com MODAL_APP_NAME no Render.
+"""
+
+import modal
+
+APP_NAME = "varvid"
+
+# ─── IMAGEM (ffmpeg + libs de rosto + fonte do headline) ──────────────────────
 image = (
     modal.Image.debian_slim(python_version="3.11")
-    .apt_install("ffmpeg", "wget", "fontconfig", "libgl1", "libglib2.0-0")
-    .pip_install("requests", "numpy")
-    .pip_install("mediapipe==0.10.9", "opencv-python-headless")
+    .apt_install("ffmpeg", "curl", "fonts-dejavu-core")
+    .pip_install(
+        "opencv-python-headless>=4.8",
+        "mediapipe==0.10.9",
+        "numpy<2",
+    )
     .run_commands(
-        "echo 'rebuild-v17-zoom-fix'",
         "mkdir -p /usr/share/fonts/poppins",
-        "wget -q -O /usr/share/fonts/poppins/Poppins-ExtraBold.ttf "
-        "'https://github.com/google/fonts/raw/main/ofl/poppins/Poppins-ExtraBold.ttf'",
-        "fc-cache -f -v",
+        "curl -fsSL -o /usr/share/fonts/poppins/Poppins-ExtraBold.ttf "
+        "https://github.com/google/fonts/raw/main/ofl/poppins/Poppins-ExtraBold.ttf || true",
     )
 )
 
-app = modal.App("varvid", image=image)
+app = modal.App(APP_NAME)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  Tudo abaixo roda DENTRO do container do Modal (a imagem tem ffmpeg + libs).
+#  É a mesma lógica de render da versão local, adaptada pra usar /tmp.
+# ══════════════════════════════════════════════════════════════════════════════
+
+import os
+import re
+import json
+import uuid
+import random
+import shutil
+import tempfile
+import subprocess
+import urllib.request
+import urllib.parse
+from pathlib import Path
+from itertools import product as iterproduct
+
+TARGET_W = 1080
+TARGET_H = 1920
+TEXT_Y_TOP = 260
 
 BLOCK_ORDER = ['hook', 'story', 'revelacao', 'prova', 'cta']
 BLOCK_ALIASES = {
     'hook':      ['hook', 'he1', 'he2', 'he3', 'he4', 'he5', 'h1', 'h2', 'h3'],
-    'story':     ['story', 'historia', 'estoria'],
+    'story':     ['story', 'historia', 'estoria', 'storia'],
     'revelacao': ['revelac', 'revelação', 'revelacao', 'rev'],
     'prova':     ['prova', 'proof', 'resultado'],
     'cta':       ['cta', 'call'],
 }
 
-TARGET_W = 1080
-TARGET_H = 1920
-FONT_PATH = '/usr/share/fonts/poppins/Poppins-ExtraBold.ttf'
-TEXT_Y_TOP = 260
+_TMP = tempfile.gettempdir()
 
+
+def _find_font():
+    for c in ['/usr/share/fonts/poppins/Poppins-ExtraBold.ttf',
+              '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf']:
+        if os.path.exists(c):
+            return c
+    return None
+
+
+FONT_PATH = _find_font()
+
+
+def _face_available():
+    try:
+        import cv2  # noqa
+        import mediapipe  # noqa
+        return True
+    except Exception:
+        return False
+
+
+# ─── PARSER DE TAKES ──────────────────────────────────────────────────────────
 
 def classify_take(filename):
     stem = Path(filename).stem.lower()
@@ -63,14 +115,9 @@ def classify_take(filename):
 def group_takes(file_list):
     groups = {}
     for filepath in file_list:
-        filename = os.path.basename(filepath)
-        info = classify_take(filename)
+        info = classify_take(os.path.basename(filepath))
         b, v, p = info['block'], info['variant'], info['part']
-        if b not in groups:
-            groups[b] = {}
-        if v not in groups[b]:
-            groups[b][v] = []
-        groups[b][v].append((p, filepath))
+        groups.setdefault(b, {}).setdefault(v, []).append((p, filepath))
     for block in groups:
         for variant in groups[block]:
             groups[block][variant].sort(key=lambda x: x[0])
@@ -79,58 +126,67 @@ def group_takes(file_list):
 
 
 def get_duration(filepath):
-    result = subprocess.run(
-        ['ffprobe', '-v', 'quiet', '-print_format', 'json', '-show_format', filepath],
-        capture_output=True, text=True
-    )
     try:
+        result = subprocess.run(
+            ['ffprobe', '-v', 'quiet', '-print_format', 'json', '-show_format', filepath],
+            capture_output=True, text=True)
         return float(json.loads(result.stdout)['format']['duration'])
-    except:
+    except Exception:
         return 0.0
 
 
+def get_fps(filepath):
+    try:
+        r = subprocess.run(
+            ['ffprobe', '-v', '0', '-select_streams', 'v:0',
+             '-show_entries', 'stream=r_frame_rate', '-of', 'default=nk=1:nw=1', filepath],
+            capture_output=True, text=True)
+        num, den = r.stdout.strip().split('/')
+        fps = float(num) / float(den)
+        return fps if fps > 0 else 30.0
+    except Exception:
+        return 30.0
+
+
+# ─── FACE DETECT (opcional) ───────────────────────────────────────────────────
+
 def detect_face_center(filepath):
+    if not _face_available():
+        return None
     try:
         import cv2
         import mediapipe as mp
-
         duration = get_duration(filepath)
         if duration < 0.1:
             return None
-
         mid = duration / 2
-        tmp_frame = f'/tmp/face_{uuid.uuid4().hex[:8]}.jpg'
-        cmd = [
-            'ffmpeg', '-y', '-ss', str(mid), '-i', filepath,
-            '-frames:v', '1', '-q:v', '2', tmp_frame
-        ]
+        tmp_frame = os.path.join(_TMP, f'face_{uuid.uuid4().hex[:8]}.jpg')
+        cmd = ['ffmpeg', '-y', '-ss', str(mid), '-i', filepath,
+               '-frames:v', '1', '-q:v', '2', tmp_frame]
         r = subprocess.run(cmd, capture_output=True)
         if r.returncode != 0 or not os.path.exists(tmp_frame):
             return None
-
         img = cv2.imread(tmp_frame)
         os.remove(tmp_frame)
         if img is None:
             return None
-
         img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         mp_face = mp.solutions.face_detection
-        with mp_face.FaceDetection(model_selection=1, min_detection_confidence=0.5) as detector:
-            results = detector.process(img_rgb)
-
+        with mp_face.FaceDetection(model_selection=1, min_detection_confidence=0.5) as det:
+            results = det.process(img_rgb)
         if not results.detections:
             return None
-
         best = max(results.detections, key=lambda d: d.location_data.relative_bounding_box.width)
         bb = best.location_data.relative_bounding_box
         cx = max(0.1, min(0.9, bb.xmin + bb.width / 2))
         cy = max(0.1, min(0.9, bb.ymin + bb.height / 2))
         return (cx, cy)
-
     except Exception as e:
-        print(f"[FACE] Erro: {e}")
+        print(f"[FACE] erro: {e}")
         return None
 
+
+# ─── COMBINAÇÕES ──────────────────────────────────────────────────────────────
 
 def build_combinations(groups, count, seed=42):
     rng = random.Random(seed)
@@ -147,10 +203,10 @@ def build_combinations(groups, count, seed=42):
     return result
 
 
+# ─── HEADLINE ─────────────────────────────────────────────────────────────────
+
 def wrap_text(text, max_chars=24):
-    words = text.split()
-    lines = []
-    current = ''
+    words, lines, current = text.split(), [], ''
     for word in words:
         if len(current) + len(word) + 1 <= max_chars:
             current = (current + ' ' + word).strip()
@@ -163,47 +219,33 @@ def wrap_text(text, max_chars=24):
     return lines
 
 
-def build_headline_filter(text, style_seed, headline_duration, font_path=FONT_PATH):
-    if not text or not text.strip():
+def build_headline_filter(text, style_seed, headline_duration):
+    if not text or not text.strip() or not FONT_PATH:
         return None
+    dark_style = (style_seed % 2 == 1)
+    bg_color   = '0x000000E6' if dark_style else '0xFFFFFFEE'
+    font_color = 'white'      if dark_style else 'black'
+    font_size, pad_x, pad_y, line_spacing = 52, 36, 18, 10
 
-    dark_style   = (style_seed % 2 == 1)
-    bg_color     = '0x000000E6' if dark_style else '0xFFFFFFEE'
-    font_color   = 'white'      if dark_style else 'black'
-    font_size    = 52
-    pad_x        = 36
-    pad_y        = 18
-    line_spacing = 10
-
-    lines     = wrap_text(text.strip(), max_chars=24)
-    num_lines = len(lines)
-    line_h    = font_size + line_spacing
-    box_h     = pad_y * 2 + line_h * num_lines - line_spacing
-
-    max_chars_line = max(len(l) for l in lines)
-    estimated_w = max_chars_line * 28 + pad_x * 2
-    box_w = min(estimated_w, TARGET_W - 80)
-    box_w = max(box_w, 300)
-    box_x = (TARGET_W - box_w) // 2
-    box_y = TEXT_Y_TOP
+    lines = wrap_text(text.strip(), max_chars=24)
+    line_h = font_size + line_spacing
+    box_h  = pad_y * 2 + line_h * len(lines) - line_spacing
+    box_w  = min(max(len(l) for l in lines) * 28 + pad_x * 2, TARGET_W - 80)
+    box_w  = max(box_w, 300)
+    box_x  = (TARGET_W - box_w) // 2
+    box_y  = TEXT_Y_TOP
     time_disable = str(float(headline_duration))
 
-    filters = []
-    filters.append(
+    filters = [
         f"drawbox=x={box_x}:y={box_y}:w={box_w}:h={box_h}:"
-        f"color={bg_color}:t=fill:"
-        f"enable='between(t,0,{time_disable})'"
-    )
+        f"color={bg_color}:t=fill:enable='between(t,0,{time_disable})'"
+    ]
     for i, line in enumerate(lines):
-        line_escaped = line.replace('\\', '\\\\').replace(':', '\\:').replace("'", "\\'")
+        esc = line.replace('\\', '\\\\').replace(':', '\\:').replace("'", "\\'")
         text_y = box_y + pad_y + i * line_h
         filters.append(
-            f"drawtext=fontfile='{font_path}':"
-            f"text='{line_escaped}':"
-            f"fontcolor={font_color}:"
-            f"fontsize={font_size}:"
-            f"x=(w-text_w)/2:"
-            f"y={text_y}:"
+            f"drawtext=fontfile='{FONT_PATH}':text='{esc}':fontcolor={font_color}:"
+            f"fontsize={font_size}:x=(w-text_w)/2:y={text_y}:"
             f"enable='between(t,0,{time_disable})'"
         )
     return ','.join(filters)
@@ -211,14 +253,10 @@ def build_headline_filter(text, style_seed, headline_duration, font_path=FONT_PA
 
 def build_zoom_filter(zoom_factor, face_center=None):
     z = zoom_factor
-    # Garante dimensões pares (necessário para H264)
     w = int(TARGET_W / z) & ~1
     h = int(TARGET_H / z) & ~1
-
-    # Garante que w e h são válidos
     w = max(2, min(w, TARGET_W))
     h = max(2, min(h, TARGET_H))
-
     if face_center:
         cx_px = int(face_center[0] * TARGET_W)
         cy_px = int(face_center[1] * TARGET_H)
@@ -227,102 +265,42 @@ def build_zoom_filter(zoom_factor, face_center=None):
     else:
         x = (TARGET_W - w) // 2
         y = (TARGET_H - h) // 2
+    x &= ~1
+    y &= ~1
+    return (f'scale={TARGET_W}:{TARGET_H}:flags=lanczos,'
+            f'crop={w}:{h}:{x}:{y},'
+            f'scale={TARGET_W}:{TARGET_H}:flags=lanczos,format=yuv420p')
 
-    # Garante que x e y são pares
-    x = x & ~1
-    y = y & ~1
 
-    # Scale para TARGET antes do crop para garantir dimensoes corretas
-    return f'scale={TARGET_W}:{TARGET_H}:flags=lanczos,crop={w}:{h}:{x}:{y},scale={TARGET_W}:{TARGET_H}:flags=lanczos,format=yuv420p'
-
+# ─── RENDER DE SEGMENTO ───────────────────────────────────────────────────────
 
 def normalize_segment(src, dst, trim_start, duration,
-                      zoom_factor=1.0, face_center=None,
-                      headline_filter=None,
-                      color_params=None,
-                      pitch_shift=0.0):
-    """
-    Renderiza um segmento com:
-    - zoom estático centrado no rosto (se detectado)
-    - ajuste de cor sutil (eq + colorchannelmixer)
-    - pitch shift sutil no áudio
-    - headline overlay (só no primeiro segmento)
-    """
+                      zoom_factor=1.0, face_center=None, headline_filter=None):
     vf_parts = []
-
-    # 1. Escala / zoom
     if zoom_factor > 1.0:
         vf_parts.append(build_zoom_filter(zoom_factor, face_center))
     else:
         vf_parts.append(
-            f'scale={TARGET_W}:{TARGET_H}:'
-            f'force_original_aspect_ratio=decrease:flags=lanczos,'
-            f'pad={TARGET_W}:{TARGET_H}:(ow-iw)/2:(oh-ih)/2:black,'
-            f'format=yuv420p'
+            f'scale={TARGET_W}:{TARGET_H}:force_original_aspect_ratio=decrease:flags=lanczos,'
+            f'pad={TARGET_W}:{TARGET_H}:(ow-iw)/2:(oh-ih)/2:black,format=yuv420p'
         )
-
-    # 2. Ajuste de cor sutil — temperatura + brilho + saturação
-    if color_params:
-        brightness = color_params.get('brightness', 0.0)   # -0.03 a +0.03
-        contrast   = color_params.get('contrast', 1.0)     # 0.97 a 1.03
-        saturation = color_params.get('saturation', 1.0)   # 0.97 a 1.03
-        # Temperatura: r_gain e b_gain opostos (quente = +r/-b, frio = -r/+b)
-        r_gain = color_params.get('r_gain', 1.0)           # 0.97 a 1.03
-        b_gain = color_params.get('b_gain', 1.0)           # 0.97 a 1.03
-
-        vf_parts.append(
-            f'eq=brightness={brightness:.3f}:'
-            f'contrast={contrast:.3f}:'
-            f'saturation={saturation:.3f}'
-        )
-        # Temperatura via colorchannelmixer (r e b channels)
-        if abs(r_gain - 1.0) > 0.001 or abs(b_gain - 1.0) > 0.001:
-            vf_parts.append(
-                f'colorchannelmixer='
-                f'rr={r_gain:.3f}:gg=1.000:bb={b_gain:.3f}'
-            )
-
-    # 3. Headline
     if headline_filter:
         vf_parts.append(headline_filter)
-
     vf = ','.join(vf_parts)
-
-    # Áudio: pitch shift via atempo + asetrate (mantém duração, muda pitch)
-    # pitch_shift em semitons — ex: 0.5 semitom = ratio 2^(0.5/12) ≈ 1.029
-    af_parts = []
-    if abs(pitch_shift) > 0.01:
-        ratio = 2 ** (pitch_shift / 12.0)
-        # asetrate muda o pitch; atempo corrige a velocidade de volta
-        af_parts.append(f'asetrate=44100*{ratio:.4f},atempo={1/ratio:.4f}')
-    af = ','.join(af_parts) if af_parts else None
 
     cmd = [
         'ffmpeg', '-y',
-        '-ss', str(trim_start),
-        '-t', str(duration),
-        '-i', src,
+        '-ss', str(trim_start), '-t', str(duration), '-i', src,
         '-vf', vf,
-    ]
-    if af:
-        cmd += ['-af', af]
-    cmd += [
-        '-c:v', 'libx264',
-        '-preset', 'ultrafast',
-        '-crf', '23',
+        '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23',
         '-pix_fmt', 'yuv420p',
-        '-c:a', 'aac',
-        '-ar', '44100',
-        '-ac', '2',
-        '-b:a', '128k',
-        '-threads', '2',
-        '-avoid_negative_ts', 'make_zero',
-        '-movflags', '+faststart',
-        dst
+        '-c:a', 'aac', '-ar', '44100', '-ac', '2', '-b:a', '128k',
+        '-threads', '2', '-avoid_negative_ts', 'make_zero',
+        '-movflags', '+faststart', dst,
     ]
     r = subprocess.run(cmd, capture_output=True)
     if r.returncode != 0:
-        print(f"[FFMPEG_ERR] {r.stderr.decode()[-600:]}")
+        print(f"[FFMPEG_ERR] {r.stderr.decode()[-500:]}")
     return r.returncode == 0 and os.path.exists(dst)
 
 
@@ -331,42 +309,32 @@ def concat_segments(seg_files, output_path):
     with open(concat_list, 'w') as f:
         for sf in seg_files:
             f.write(f"file '{sf}'\n")
-    cmd = [
-        'ffmpeg', '-y',
-        '-f', 'concat', '-safe', '0',
-        '-i', concat_list,
-        '-c', 'copy',
-        '-movflags', '+faststart',
-        output_path
-    ]
+    cmd = ['ffmpeg', '-y', '-f', 'concat', '-safe', '0', '-i', concat_list,
+           '-c', 'copy', '-movflags', '+faststart', output_path]
     r = subprocess.run(cmd, capture_output=True)
-    os.remove(concat_list)
-    return r.returncode == 0 and os.path.exists(output_path)
+    if r.returncode != 0 or not os.path.exists(output_path):
+        cmd2 = ['ffmpeg', '-y', '-f', 'concat', '-safe', '0', '-i', concat_list,
+                '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23',
+                '-c:a', 'aac', '-ar', '44100', '-ac', '2',
+                '-pix_fmt', 'yuv420p', '-threads', '2',
+                '-movflags', '+faststart', output_path]
+        r = subprocess.run(cmd2, capture_output=True)
+    if os.path.exists(concat_list):
+        os.remove(concat_list)
+    return os.path.exists(output_path)
 
 
 def render_variation(groups, combo, output_path, tmp_dir,
-                     headline_text='', headline_duration=3,
-                     face_cache=None):
+                     headline_text='', headline_duration=3, face_cache=None):
     rng = random.Random(combo['_micro_seed'] * 9973 + 1337)
     os.makedirs(tmp_dir, exist_ok=True)
-    seg_files = []
-    takes_used = {}
+    seg_files, takes_used = [], {}
 
     headline_filter = None
     if headline_text and headline_text.strip():
         headline_filter = build_headline_filter(
-            headline_text,
-            style_seed=combo['_micro_seed'],
-            headline_duration=headline_duration
-        )
-
-    # Variação de cor removida — fingerprint via combinações de takes + zoom
-    color_params = None
-
-    # Pitch shift — único por vídeo: ±0.5 semitom máximo
-    pitch_shift = 0.0  # pitch shift removido
-
-    pass  # cor e pitch removidos
+            headline_text, style_seed=combo['_micro_seed'],
+            headline_duration=headline_duration)
 
     all_segs = []
     for block in BLOCK_ORDER:
@@ -374,32 +342,24 @@ def render_variation(groups, combo, output_path, tmp_dir,
             continue
         for part_idx, filepath in enumerate(groups[block][combo[block]]):
             all_segs.append((block, part_idx, filepath))
-            if block not in takes_used:
-                takes_used[block] = []
             fname = os.path.basename(filepath)
+            takes_used.setdefault(block, [])
             if fname not in takes_used[block]:
                 takes_used[block].append(fname)
 
     total = len(all_segs)
-
-    # Variação de escala entre segmentos — alterna plano aberto/fechado
-    # Escala base por segmento: alguns em 1.0, alguns em 1.04-1.06
     scale_levels = []
     for i in range(total):
         if i == 0 or i == total - 1:
-            scale_levels.append(1.0)  # hook e CTA sempre em escala normal
+            scale_levels.append(1.0)
         else:
-            # Alterna entre aberto e fechado para criar ritmo nos cortes
             scale_levels.append(rng.choice([1.0, rng.uniform(1.03, 1.06)]))
 
     for i, (block, part_idx, filepath) in enumerate(all_segs):
         duration = get_duration(filepath)
         if duration < 0.1:
             continue
-
-        is_first = (i == 0)
-        is_last  = (i == total - 1)
-
+        is_first, is_last = (i == 0), (i == total - 1)
         trim_start = 0.0 if is_first else rng.randint(1, 4) / 30.0
         trim_end   = duration if is_last else duration - (rng.randint(1, 3) / 30.0)
         if trim_end <= trim_start + 0.1:
@@ -408,154 +368,169 @@ def render_variation(groups, combo, output_path, tmp_dir,
 
         zoom_factor = scale_levels[i]
         face_center = face_cache.get(filepath) if (face_cache and zoom_factor > 1.0) else None
-
         seg_out = os.path.join(tmp_dir, f'seg_{i:03d}.mp4')
         seg_headline = headline_filter if is_first else None
 
-        ok = normalize_segment(
-            filepath, seg_out,
-            trim_start, actual_duration,
-            zoom_factor=zoom_factor,
-            face_center=face_center,
-            headline_filter=seg_headline,
-            color_params=color_params,
-            pitch_shift=pitch_shift
-        )
-
-        if ok:
+        if normalize_segment(filepath, seg_out, trim_start, actual_duration,
+                             zoom_factor=zoom_factor, face_center=face_center,
+                             headline_filter=seg_headline):
             seg_files.append(seg_out)
         else:
-            print(f"[WARN] Falhou segmento {i}: {filepath}")
+            print(f"[WARN] falhou segmento {i}: {filepath}")
 
     if not seg_files:
         return False, {}
     if len(seg_files) == 1:
         shutil.move(seg_files[0], output_path)
         return os.path.exists(output_path), takes_used
-    ok = concat_segments(seg_files, output_path)
-    return ok, takes_used
+    return concat_segments(seg_files, output_path), takes_used
 
 
-@app.function(timeout=1800, memory=2048)
-def process_job_http(job_id: str, file_urls: list, output_base_url: str,
-                     count: int, headline_text: str = '',
-                     headline_duration: int = 3):
-    import requests
-    import time
+# ─── MODO VÍDEO ÚNICO ─────────────────────────────────────────────────────────
 
-    tmp_base = f'/tmp/varvid_{job_id}'
-    takes_dir = os.path.join(tmp_base, 'takes')
-    output_dir = os.path.join(tmp_base, 'output')
+def render_single_variation(src, dst, tmp_dir, micro_seed,
+                            headline_text='', headline_duration=3):
+    rng = random.Random(micro_seed * 9973 + 1337)
+    os.makedirs(tmp_dir, exist_ok=True)
+
+    duration = get_duration(src)
+    fps = get_fps(src)
+    if duration < 0.3:
+        return False
+
+    trim_start = rng.randint(1, 4) / fps
+    end_cut    = rng.randint(1, 3) / fps
+    new_duration = duration - trim_start - end_cut
+    if new_duration < 0.3:
+        trim_start, new_duration = 0.0, duration
+
+    zoom = rng.uniform(1.02, 1.06)
+
+    headline_filter = None
+    if headline_text and headline_text.strip():
+        headline_filter = build_headline_filter(
+            headline_text, style_seed=micro_seed, headline_duration=headline_duration)
+
+    return normalize_segment(
+        src, dst, trim_start, new_duration,
+        zoom_factor=zoom, face_center=None, headline_filter=headline_filter)
+
+
+# ─── RUNNERS (chamam os PUTs de volta pro app web) ────────────────────────────
+
+def _run_remix(files, out_dir, count, headline_text, headline_duration, put_file):
+    groups = group_takes(files)
+    print("[MODAL] blocos:", list(groups.keys()))
+    face_cache = {}
+    if _face_available():
+        print("[MODAL] analisando rostos...")
+        for fp in files:
+            face_cache[fp] = detect_face_center(fp)
+    combos = build_combinations(groups, count)
+    takes_map = {}
+    for i, combo in enumerate(combos):
+        fname = f"variation_{i+1:02d}.mp4"
+        out_path = os.path.join(out_dir, fname)
+        tmp_dir = os.path.join(out_dir, f"tmp_{i}")
+        print(f"[MODAL][remix] {i+1}/{count}")
+        ok, takes_used = render_variation(
+            groups, combo, out_path, tmp_dir,
+            headline_text=headline_text, headline_duration=headline_duration,
+            face_cache=face_cache)
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+        if ok and os.path.exists(out_path):
+            put_file(fname, out_path)
+            takes_map[fname] = takes_used
+        else:
+            print(f"[MODAL] falhou variação {i+1}")
+    return takes_map
+
+
+def _run_single(files, out_dir, count, headline_text, headline_duration, put_file):
+    if not files:
+        raise RuntimeError("nenhum vídeo enviado")
+    files = sorted(files)
+    for i in range(count):
+        src = files[i % len(files)]
+        fname = f"variation_{i+1:02d}.mp4"
+        out_path = os.path.join(out_dir, fname)
+        tmp_dir = os.path.join(out_dir, f"tmp_{i}")
+        print(f"[MODAL][single] {i+1}/{count} <- {os.path.basename(src)}")
+        ok = render_single_variation(
+            src, out_path, tmp_dir, micro_seed=i,
+            headline_text=headline_text, headline_duration=headline_duration)
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+        if not (ok and os.path.exists(out_path)):
+            print(f"[MODAL] falhou variação {i+1}")
+            continue
+        put_file(fname, out_path)
+    return {}
+
+
+# ─── FUNÇÃO PRINCIPAL (o app web dá spawn nesta) ──────────────────────────────
+
+@app.function(image=image, timeout=1800, memory=2048, cpu=2.0)
+def process_job_http(job_id, file_urls, output_base_url, count,
+                     headline_text="", headline_duration=3,
+                     mode="remix", callback_secret=""):
+    workdir = tempfile.mkdtemp(prefix=f"varvid_{job_id}_")
+    takes_dir = os.path.join(workdir, "takes")
+    out_dir = os.path.join(workdir, "out")
     os.makedirs(takes_dir, exist_ok=True)
-    os.makedirs(output_dir, exist_ok=True)
+    os.makedirs(out_dir, exist_ok=True)
 
+    def _with_token(url):
+        if callback_secret and "token=" not in url:
+            url += ("&" if "?" in url else "?") + "token=" + urllib.parse.quote(callback_secret)
+        return url
+
+    def _put(url, data, ctype):
+        req = urllib.request.Request(_with_token(url), data=data, method="PUT",
+                                     headers={"Content-Type": ctype})
+        with urllib.request.urlopen(req, timeout=180) as r:
+            return r.read()
+
+    def put_file(fname, path):
+        with open(path, "rb") as f:
+            _put(f"{output_base_url}/{urllib.parse.quote(fname)}", f.read(), "video/mp4")
+        print(f"[MODAL] devolvido {fname}")
+
+    def put_meta(name, obj):
+        _put(f"{output_base_url}/meta/{urllib.parse.quote(name)}",
+             json.dumps(obj).encode(), "application/json")
+
+    # 1) baixa os takes
+    local_files = []
+    for url in file_urls:
+        base = urllib.parse.unquote(urllib.parse.urlparse(url).path.split("/")[-1])
+        dst = os.path.join(takes_dir, base or f"take_{len(local_files)}.mp4")
+        try:
+            with urllib.request.urlopen(_with_token(url), timeout=180) as r, open(dst, "wb") as f:
+                shutil.copyfileobj(r, f)
+            local_files.append(dst)
+        except Exception as e:
+            print("[MODAL] falha ao baixar", url, e)
+
+    # 2) renderiza  +  3) devolve
     try:
-        file_list = []
-        for url in file_urls:
-            fname = url.split('/')[-1]
-            local_path = os.path.join(takes_dir, fname)
-            print(f"[DL] {fname}")
-            downloaded = False
-            for attempt in range(5):
-                try:
-                    if attempt > 0:
-                        time.sleep(3 * attempt)
-                    with requests.get(url, timeout=120, stream=True) as r:
-                        if r.status_code == 200:
-                            with open(local_path, 'wb') as f:
-                                for chunk in r.iter_content(chunk_size=1024*1024):
-                                    if chunk:
-                                        f.write(chunk)
-                            file_list.append(local_path)
-                            downloaded = True
-                            break
-                except Exception as e:
-                    print(f"[ERR] {fname}: {e}")
-            if not downloaded:
-                print(f"[SKIP] {fname}")
-
-        if not file_list:
-            return {'error': 'no files downloaded'}
-
-        groups = group_takes(file_list)
-        print(f"[INFO] Blocos: {list(groups.keys())}")
-
-        # Análise de rostos — uma vez por take
-        print("[FACE] Analisando rostos...")
-        face_cache = {}
-        for filepath in file_list:
-            result = detect_face_center(filepath)
-            face_cache[filepath] = result
-            status = f"({result[0]:.2f}, {result[1]:.2f})" if result else "não detectado"
-            print(f"[FACE] {os.path.basename(filepath)}: {status}")
-
-        combos = build_combinations(groups, count)
-        output_files = []
-
-        for i, combo in enumerate(combos):
-            print(f"[RENDER] {i+1}/{count}")
-            out_path = os.path.join(output_dir, f'variation_{i+1:02d}.mp4')
-            tmp_dir  = os.path.join(tmp_base, f'tmp_{i}')
-
-            success, takes_used = render_variation(
-                groups, combo, out_path, tmp_dir,
-                headline_text=headline_text,
-                headline_duration=headline_duration,
-                face_cache=face_cache
-            )
-            shutil.rmtree(tmp_dir, ignore_errors=True)
-
-            if success and os.path.exists(out_path):
-                fname = f'variation_{i+1:02d}.mp4'
-
-                # Metadata com retry
-                meta = json.dumps(takes_used)
-                for attempt in range(4):
-                    try:
-                        r = requests.put(
-                            f"{output_base_url}/meta/{fname}",
-                            data=meta.encode(),
-                            headers={'Content-Type': 'application/json'},
-                            timeout=30
-                        )
-                        if r.status_code == 200:
-                            break
-                    except Exception as e:
-                        print(f"[WARN] meta attempt {attempt+1}: {e}")
-                        time.sleep(2 * (attempt + 1))
-
-                # Upload do vídeo com retry robusto
-                with open(out_path, 'rb') as f:
-                    video_data = f.read()
-                uploaded = False
-                for attempt in range(5):
-                    try:
-                        if attempt > 0:
-                            print(f"[RETRY] {fname} tentativa {attempt+1}")
-                            time.sleep(3 * attempt)
-                        resp = requests.put(
-                            f"{output_base_url}/{fname}",
-                            data=video_data,
-                            headers={'Content-Type': 'video/mp4'},
-                            timeout=300
-                        )
-                        if resp.status_code == 200:
-                            output_files.append(fname)
-                            print(f"[OK] {fname} ({len(video_data)//1024//1024}MB)")
-                            uploaded = True
-                            break
-                        else:
-                            print(f"[WARN] {fname} status {resp.status_code}")
-                    except Exception as e:
-                        print(f"[ERR] {fname} attempt {attempt+1}: {e}")
-
-                if not uploaded:
-                    print(f"[ERR] Falhou upload {fname} após 5 tentativas")
-                os.remove(out_path)
-            else:
-                print(f"[ERR] Render falhou render {i+1}")
-
-        return {'status': 'done', 'files': output_files, 'count': len(output_files)}
-
+        if not local_files:
+            raise RuntimeError("nenhum take baixado")
+        if mode == "single":
+            takes_map = _run_single(local_files, out_dir, count,
+                                    headline_text, headline_duration, put_file)
+        else:
+            takes_map = _run_remix(local_files, out_dir, count,
+                                   headline_text, headline_duration, put_file)
+        if takes_map:
+            put_meta("takes_map.json", takes_map)
+        put_meta("_done.json", {"status": "done", "takes_map": takes_map})
+        print(f"[MODAL] job {job_id} concluído")
+    except Exception as e:
+        import traceback
+        print("[MODAL] erro:", e, traceback.format_exc())
+        try:
+            put_meta("_done.json", {"status": "error", "error": str(e)})
+        except Exception as e2:
+            print("[MODAL] falha ao avisar erro:", e2)
     finally:
-        shutil.rmtree(tmp_base, ignore_errors=True)
+        shutil.rmtree(workdir, ignore_errors=True)
