@@ -214,6 +214,10 @@ body.ready{opacity:1}
         <div class="drop-sub" id="drop-sub">ou clique para selecionar</div>
         <div class="badge" id="badge">✦ <span id="fcount">0</span> arquivo(s)</div>
       </div>
+      <div class="ng-tip" id="single-hint" style="display:none">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+        <div>Aqui vai <b>um vídeo só</b>, já montado. O VarVid cria cópias dele com pequenas diferenças. Para <b>juntar vários takes</b> (hook, story, CTA), use a aba <b>Remix de takes</b>.</div>
+      </div>
     </div>
 
     <div class="sec">
@@ -456,10 +460,15 @@ function setMode(m){
   $('naming-sec').style.display = single?'none':'block';
   $('upload-label').textContent = single?'Seu vídeo':'Seus takes';
   $('drop-main').textContent = single?'Arraste 1 vídeo pronto':'Arraste seus takes aqui';
-  // QA #6: "ou vários pra gerar em lote" contradizia o nome do modo. O backend
-  // aceita mais de um arquivo e alterna entre eles (files[i % len]) — o texto
-  // agora diz exatamente isso, em vez de prometer lote.
-  $('drop-sub').textContent = single?'.mp4 · .mov — 1 vídeo (mais de um alterna entre eles)':'ou clique para selecionar';
+  // QA #6: "ou vários pra gerar em lote" contradizia o nome do modo.
+  // Agora o modo único aceita UM arquivo e diz isso em três lugares: no texto,
+  // no seletor do sistema (sem 'multiple') e no aviso se alguém soltar vários.
+  $('drop-sub').textContent = single?'.mp4 · .mov — apenas 1 vídeo':'ou clique para selecionar';
+  // Sem o atributo 'multiple' o próprio seletor do macOS/Windows só deixa
+  // escolher um arquivo — o aviso vira impossibilidade, não só texto.
+  if(single) $('file').removeAttribute('multiple');
+  else       $('file').setAttribute('multiple','');
+  $('single-hint').style.display = single?'block':'none';
   $('remix-right').style.display = single?'none':'block';
   $('single-right').style.display = single?'block':'none';
   clearSelection();
@@ -489,10 +498,22 @@ function onFiles(fl){
   const all=Array.from(fl);
   selectedFiles=all.filter(f=>exts.some(x=>f.name.toLowerCase().endsWith(x)));
   const rejeitados=all.length-selectedFiles.length;
+
+  // Arrastar-e-soltar ignora a falta do 'multiple' no input: dá pra soltar 10
+  // arquivos de uma vez. Aqui a regra do modo único é aplicada de verdade.
+  let excedentes=0;
+  if(mode==='single' && selectedFiles.length>1){
+    excedentes=selectedFiles.length-1;
+    selectedFiles=[selectedFiles[0]];
+  }
+
   $('badge').innerHTML='✦ <span id="fcount">'+selectedFiles.length+'</span> arquivo(s)';
   $('badge').className = selectedFiles.length?'badge show':'badge';
   updateClearButtons();
   if(rejeitados>0) toast(rejeitados+' arquivo(s) ignorado(s) — aceito .mp4, .mov, .avi, .mkv e .webm.',true);
+  if(excedentes>0){
+    toast('O modo Vídeo único usa 1 vídeo por vez — mantive "'+selectedFiles[0].name+'" e ignorei os outros '+excedentes+'. Para juntar takes, use a aba Remix de takes.',true,0);
+  }
   if(!selectedFiles.length){ $('go').disabled=true; return; }
   if(mode==='remix'){ analyze(); }
   else { $('go').disabled=false; showEmpty(false); }
