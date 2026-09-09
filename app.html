@@ -81,6 +81,8 @@ body.ready{opacity:1}
 
 .drop{border:1px dashed #333;border-radius:14px;padding:22px 16px;text-align:center;background:var(--bg2);cursor:pointer;position:relative}
 .drop.over{border-color:var(--accent)}
+.drop.locked{opacity:.4;cursor:not-allowed;border-style:solid}
+.drop.locked input{pointer-events:none;cursor:not-allowed}
 .drop input{position:absolute;inset:0;opacity:0;cursor:pointer}
 .drop-ic{width:42px;height:42px;background:#111;border:1px solid #2a2a2a;border-radius:12px;display:grid;place-items:center;margin:0 auto 10px}
 .drop-main{font-size:13px;color:#ddd}
@@ -362,6 +364,7 @@ const HTTP_MSG={
 const ERR_MSG={
   sem_creditos:'Créditos insuficientes. Reduza a quantidade ou faça upgrade do plano.',
   sem_espaco:'O servidor está sem espaço agora. Tente de novo em alguns minutos.',
+  geracao_em_andamento:'Você já tem uma geração em andamento. Espere ela terminar, ou use "Limpar" para cancelar e começar de novo.',
   falha_io:'O servidor não conseguiu gravar seus arquivos. Tente de novo em instantes.',
   unauthorized:'Sua sessão expirou. Recarregue a página e entre de novo.',
   'no files':'Nenhum arquivo foi enviado.',
@@ -443,6 +446,9 @@ async function subscribe(key){
 }
 
 function setMode(m){
+  // Trocar de aba durante o render limparia o polling e deixaria o job órfão:
+  // a tela ficaria ociosa enquanto o backend ainda o considera em andamento.
+  if(gerando){ toast('Espere a geração terminar para trocar de modo.',true); return; }
   mode=m; resetJob();
   const single = m==='single';
   $('tab-single').classList.toggle('active',single);
@@ -475,6 +481,10 @@ function wire(){
 }
 
 function onFiles(fl){
+  if(gerando){   // trava também o arrastar-e-soltar, que ignora input.disabled
+    toast(ERR_MSG.geracao_em_andamento,true);
+    return;
+  }
   const exts=['.mp4','.mov','.avi','.mkv','.webm'];
   const all=Array.from(fl);
   selectedFiles=all.filter(f=>exts.some(x=>f.name.toLowerCase().endsWith(x)));
@@ -534,8 +544,9 @@ function renderStructure(summary,maxCombos){
 }
 
 async function generate(){
-  if(!selectedFiles.length)return;
-  $('go').disabled=true; $('go').textContent='GERANDO…';
+  if(!selectedFiles.length || gerando)return;
+  setGerando(true);
+  $('go').textContent='GERANDO…';
   results=[]; renderResults(); showEmpty(false);
   const headline=$('hl').value.trim(), hd=parseInt($('hd').value||'3')||3;
   try{
@@ -563,7 +574,7 @@ async function generate(){
     if(e.code==='sem_creditos') refreshMe();
   }
 }
-function resetBtn(){ $('go').disabled=false; $('go').textContent='▶ GERAR VARIAÇÕES'; }
+function resetBtn(){ setGerando(false); $('go').textContent='▶ GERAR VARIAÇÕES'; }
 function errText(d){ if(d.error==='sem_creditos'){ return 'Créditos insuficientes'+(d.credits!=null?' ('+d.credits+' restantes)':'')+'. Reduza a quantidade ou faça upgrade do plano.'; } return 'Erro: '+d.error; }
 
 /* O polling antigo engolia TODO erro em silêncio ("ignora blips de rede").
@@ -671,6 +682,23 @@ function updateClearButtons(){
   if(b) b.style.display = selectedFiles.length ? 'inline-flex' : 'none';
 }
 
+/* ── TRAVA DURANTE A GERAÇÃO ───────────────────────────────────────────────────
+   O botão GERAR já ficava desabilitado, mas a área de upload continuava ativa —
+   arrastar um arquivo novo no meio do render disparava /analyze, que apagava o
+   job em andamento (créditos já cobrados, nenhum vídeo entregue).
+   O backend agora recusa com 409; aqui a interface deixa claro ANTES do clique,
+   em vez de deixar o usuário esbarrar num erro.                               */
+let gerando=false;
+function setGerando(v){
+  gerando=v;
+  const drop=$('drop');
+  $('file').disabled=v;
+  drop.classList.toggle('locked',v);
+  drop.title = v ? 'Aguarde a geração atual terminar' : '';
+  $('go').disabled = v || !selectedFiles.length;
+  updateClearButtons();
+}
+
 // Lembra a última geração pra sobreviver a um reload sem querer
 function saveLastJob(){ try{ if(jobId) localStorage.setItem('varvid_last_job', JSON.stringify({jobId:jobId, ts:Date.now()})); }catch(e){} }
 function clearLastJob(){ try{ localStorage.removeItem('varvid_last_job'); }catch(e){} }
@@ -683,7 +711,11 @@ async function restoreLastJob(){
   const files=st.files||[];
   if(st.status==='not_found' || (!files.length && st.status!=='rendering')){ clearLastJob(); return; }
   jobId=saved.jobId; results=files; renderResults(); showEmpty(false);
-  if(st.status==='rendering'){ startPolling(); }   // retoma se ainda estava gerando
+  if(st.status==='rendering'||st.status==='queued'){
+    setGerando(true);          // retomou um job vivo: a trava volta com ele
+    $('go').textContent='GERANDO…';
+    startPolling();
+  }
 }
 
 boot();

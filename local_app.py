@@ -1038,18 +1038,90 @@ def _purge_job(jid):
     shutil.rmtree(os.path.join(DATA_DIR, jid), ignore_errors=True)
 
 
-def cleanup_user(uid):
-    """Remove só os jobs do usuário atual (mantém os de outros usuários)."""
+# ─── ESTADO "EM ANDAMENTO" ────────────────────────────────────────────────────
+# Um job só bloqueia uma nova geração enquanto estiver DE FATO rodando. Sem um
+# conceito de job morto, um container do Modal que morre sem mandar o _done
+# deixaria o status preso em 'queued' e trancaria o usuário pra sempre — um bug
+# pior que o problema original.
+#
+# O corte usa o created_at do próprio job, não o mtime do arquivo: o /status
+# reescreve o JSON a cada consulta, então o mtime só avança enquanto a aba está
+# aberta. Quem fecha a aba durante um render longo teria o job dado como morto.
+# O limite fica acima do timeout do Modal (1800s), pra nunca cortar antes dele.
+
+JOB_STALE_MINUTES = float(os.environ.get('VARVID_JOB_STALE_MINUTES', '45'))
+RUNNING_STATES = ('queued', 'rendering')
+
+
+def _job_is_running(j, now=None):
+    """True se o job está rodando e ainda dentro do prazo plausível."""
+    if not j or j.get('status') not in RUNNING_STATES:
+        return False
+    now = now or time.time()
+    started = j.get('created_at')
+    if not started:
+        return True          # job antigo, sem carimbo: trata como vivo
+    return (now - float(started)) < JOB_STALE_MINUTES * 60
+
+
+def user_jobs_sweep(uid, purge=True, force=False):
+    """Varre os jobs do usuário UMA vez e devolve o que está rodando (ou None).
+
+    Substitui o antigo cleanup_user, que apagava tudo do usuário sem olhar o
+    status — inclusive uma geração em andamento. Agora:
+      · achou job rodando  -> devolve e NÃO apaga nada (o endpoint vai recusar,
+                              então seria injusto destruir os downloads antigos)
+      · não achou          -> limpa os jobs encerrados, liberando espaço
+      · force=True         -> apaga tudo, inclusive o que está rodando. Só o
+                              botão "Limpar" usa isso: é o usuário pedindo, e
+                              precisa funcionar mesmo com um job travado — é a
+                              válvula de escape dele.
+    Uma varredura só, em vez de duas (antes eram cleanup + verificação).
+    """
+    now = time.time()
+    running = None
+    encerrados = []
     try:
         for entry in os.scandir(DATA_DIR):
             name = entry.name
-            if entry.is_file() and name.endswith('.json'):
-                jid = name[:-5]
-                j = load_job(jid)
-                if j and j.get('user_id') == uid:
-                    _purge_job(jid)
-    except Exception:
-        pass
+            if not (entry.is_file() and name.endswith('.json')):
+                continue
+            jid = name[:-5]
+            j = load_job(jid)
+            if not j or j.get('user_id') != uid:
+                continue
+            if not force and _job_is_running(j, now):
+                running = dict(j, job_id=jid)
+            else:
+                encerrados.append(jid)
+    except Exception as e:
+        print('[JOBS] erro ao varrer jobs de %s: %s' % (uid, e))
+        return None
+    if running:
+        return running                       # bloqueia: não apaga nada
+    if purge or force:
+        for jid in encerrados:
+            _purge_job(jid)
+    return None
+
+
+def cleanup_user(uid):
+    """Compatibilidade: limpa os jobs encerrados do usuário."""
+    user_jobs_sweep(uid, purge=True)
+
+
+def _bloqueio_geracao_em_andamento(uid):
+    """Recusa nova geração se já existe uma rodando. None = pode seguir."""
+    running = user_jobs_sweep(uid)
+    if not running:
+        return None
+    print('[JOBS] %s tentou nova geração com %s em andamento' % (uid, running.get('job_id')))
+    return jsonify({
+        'error': 'geracao_em_andamento',
+        'job_id': running.get('job_id'),
+        'completed': running.get('completed', 0),
+        'count_requested': running.get('count_requested'),
+    }), 409
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1118,11 +1190,13 @@ def _release_sweep_lock():
 
 
 def _is_job_active(jid, now):
-    """Não apagar job em andamento, por mais antigo que pareça."""
-    j = load_job(jid)
-    if not j:
-        return False
-    return j.get('status') in ('queued', 'rendering')
+    """Não apagar job em andamento — mas um job travado não é 'em andamento'.
+
+    Usa a MESMA regra do bloqueio (_job_is_running). Se fossem regras
+    diferentes, um job preso em 'queued' escaparia da limpeza pra sempre e
+    ocuparia disco eternamente.
+    """
+    return _job_is_running(load_job(jid), now)
 
 
 def sweep_old_jobs(ttl_hours=None, force=False):
@@ -1423,7 +1497,9 @@ def admin_clear():
     uid = current_user_id()
     if AUTH_ENABLED and not uid:
         return jsonify({'error': 'unauthorized'}), 401
-    cleanup_user(uid)
+    # force=True: o "Limpar" é a válvula de escape do usuário e precisa
+    # funcionar mesmo com um job travado — senão o bloqueio vira uma prisão.
+    user_jobs_sweep(uid, force=True)
     return jsonify({'ok': True})
 
 
@@ -1432,7 +1508,12 @@ def analyze():
     uid = current_user_id()
     if AUTH_ENABLED and not uid:
         return jsonify({'error': 'unauthorized'}), 401
-    cleanup_user(uid)
+    # Antes, esta linha apagava TODOS os jobs do usuário — inclusive um que
+    # estivesse renderizando. Bastava subir arquivo novo sem esperar (ou abrir
+    # outra aba) pra matar a própria geração e perder os créditos já cobrados.
+    bloqueio = _bloqueio_geracao_em_andamento(uid)
+    if bloqueio:
+        return bloqueio
     if 'files' not in request.files:
         return jsonify({'error': 'no files'}), 400
 
@@ -1530,7 +1611,8 @@ def generate():
 
     job.update({'status': 'queued', 'files': [], 'completed': 0,
                 'count_requested': count, 'headline_text': headline_text,
-                'headline_duration': headline_duration, 'takes_map': {}, 'progress': 0})
+                'headline_duration': headline_duration, 'takes_map': {}, 'progress': 0,
+                'created_at': time.time()})   # base do "job travado" (JOB_STALE_MINUTES)
     save_job(job_id, job)
 
     if MODAL_ENABLED:
@@ -1682,7 +1764,9 @@ def single_generate():
     uid = current_user_id()
     if AUTH_ENABLED and not uid:
         return jsonify({'error': 'unauthorized'}), 401
-    cleanup_user(uid)
+    bloqueio = _bloqueio_geracao_em_andamento(uid)
+    if bloqueio:
+        return bloqueio
     if 'files' not in request.files:
         return jsonify({'error': 'no files'}), 400
 
@@ -1728,7 +1812,7 @@ def single_generate():
         'status': 'queued', 'mode': 'single', 'files': [], 'completed': 0,
         'count_requested': count, 'headline_text': headline_text,
         'headline_duration': headline_duration, 'progress': 0,
-        'user_id': uid,
+        'user_id': uid, 'created_at': time.time(),
     })
 
     if MODAL_ENABLED:
