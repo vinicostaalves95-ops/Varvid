@@ -19,6 +19,8 @@ import json
 import uuid
 import random
 import shutil
+import errno
+import tempfile
 import subprocess
 import threading
 from pathlib import Path
@@ -976,16 +978,64 @@ def job_dir(job_id):
 
 
 def save_job(job_id, data):
-    with open(os.path.join(DATA_DIR, job_id + '.json'), 'w') as f:
-        json.dump(data, f)
+    """Grava o job de forma ATÔMICA.
+
+    O jeito antigo (`open(path,'w')` + json.dump) truncava o arquivo ANTES de
+    escrever: se o dump falhasse no meio (disco cheio, worker morto), o JSON
+    ficava vazio pra sempre e todo /status daquele job virava 500 eterno.
+    Foi exatamente o que derrubou a produção em 06/09/2026.
+    Escrevendo em .tmp e trocando com os.replace(), ou o arquivo antigo continua
+    íntegro, ou o novo aparece inteiro — nunca um estado pela metade.
+    """
+    path = os.path.join(DATA_DIR, job_id + '.json')
+    # O temporário PRECISA ser único por escritor. Com um nome fixo (job.json.tmp),
+    # dois workers do gunicorn gravando o mesmo job — o que acontece de fato entre
+    # o PUT do Modal e o /status — abririam o MESMO arquivo, intercalariam bytes e
+    # o os.replace publicaria lixo. mkstemp dá um nome exclusivo e atômico.
+    fd, tmp = tempfile.mkstemp(dir=DATA_DIR, prefix=job_id + '.', suffix='.tmp')
+    try:
+        with os.fdopen(fd, 'w') as f:
+            json.dump(data, f)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, path)          # atômico: ou o antigo, ou o novo inteiro
+    except Exception as e:
+        try:
+            os.remove(tmp)
+        except Exception:
+            pass
+        print('[JOB] falha ao salvar %s: %s' % (job_id, e))
+        raise
 
 
 def load_job(job_id):
+    """Lê o job. Devolve None se o arquivo sumiu OU está corrompido/vazio.
+
+    Antes, um JSON vazio estourava JSONDecodeError e o Flask devolvia 500 —
+    o front recebia HTML no lugar de JSON e mostrava "Unexpected token '<'".
+    """
     path = os.path.join(DATA_DIR, job_id + '.json')
     if not os.path.exists(path):
         return None
-    with open(path) as f:
-        return json.load(f)
+    try:
+        with open(path) as f:
+            return json.load(f)
+    except (json.JSONDecodeError, ValueError, OSError) as e:
+        # Leitura NÃO apaga: quem é dono da remoção é o sweeper. Uma leitura que
+        # muta o disco cria corrida com um escritor concorrente (um reader chegou
+        # a apagar arquivo que um writer ia publicar). Devolver None já basta —
+        # o /status responde 'not_found' em JSON e o sweeper recolhe o lixo.
+        print('[JOB] arquivo ilegível, tratando como inexistente %s: %s' % (job_id, e))
+        return None
+
+
+def _purge_job(jid):
+    """Apaga o JSON e a pasta de um job."""
+    try:
+        os.remove(os.path.join(DATA_DIR, jid + '.json'))
+    except Exception:
+        pass
+    shutil.rmtree(os.path.join(DATA_DIR, jid), ignore_errors=True)
 
 
 def cleanup_user(uid):
@@ -997,13 +1047,200 @@ def cleanup_user(uid):
                 jid = name[:-5]
                 j = load_job(jid)
                 if j and j.get('user_id') == uid:
-                    try:
-                        os.remove(entry.path)
-                    except Exception:
-                        pass
-                    shutil.rmtree(os.path.join(DATA_DIR, jid), ignore_errors=True)
+                    _purge_job(jid)
     except Exception:
         pass
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  RETENÇÃO DE ARQUIVOS  —  ⚠️ PONTE, NÃO DESTINO
+#
+#  Isto existe porque hoje o estado do job (JSON) e os vídeos moram no disco
+#  local do app. Foi essa escolha que encheu o disco do Render em 06/09/2026.
+#
+#  DESTINO PRETENDIDO (mantém tudo abaixo obsoleto, sem cirurgia):
+#    · estado do job  -> tabela `jobs` no Supabase (fonte de verdade já existe lá
+#                        pra usuários/créditos; resolve de quebra a corrida entre
+#                        os 2 workers do gunicorn)
+#    · vídeos         -> R2/S3 com lifecycle rule de N dias
+#                        (a expiração vira config do bucket: zero código)
+#
+#  Quando essa migração acontecer, apague este bloco inteiro, as chamadas a
+#  ensure_disk_space() em /analyze e /single/generate, e o start_sweeper() do
+#  boot. Nada mais depende disto — a dependência foi deixada de propósito em um
+#  ponto só de cada endpoint, pra sair limpo.
+#
+#  Enquanto a ponte existir, ela precisa ser: (a) segura com múltiplos workers,
+#  (b) desligável sem deploy, (c) capaz de escalar a agressividade antes de
+#  deixar o app cair.
+# ══════════════════════════════════════════════════════════════════════════════
+
+JOB_TTL_HOURS       = float(os.environ.get('VARVID_JOB_TTL_HOURS', '24'))
+SWEEP_EVERY_SECONDS = float(os.environ.get('VARVID_SWEEP_SECONDS', '1800'))
+# TTL de emergência: só entra em ação quando o disco já está no limite.
+EMERGENCY_TTL_HOURS = float(os.environ.get('VARVID_EMERGENCY_TTL_HOURS', '2'))
+# 'off' entrega a responsabilidade a um Render Cron Job ou ao lifecycle do bucket
+# sem exigir mudança de código.
+SWEEPER_ENABLED = (os.environ.get('VARVID_SWEEPER', 'on').strip().lower() != 'off')
+
+_SWEEP_LOCK = os.path.join(DATA_DIR, '.sweep.lock')
+
+
+def _acquire_sweep_lock(max_age=600):
+    """Lock entre processos: com N workers do gunicorn, só um varre por vez.
+
+    O.EXCL é atômico no filesystem. Um lock mais velho que max_age é considerado
+    órfão (worker morto no meio) e recuperado — senão a limpeza pararia pra
+    sempre depois de um crash.
+    """
+    try:
+        fd = os.open(_SWEEP_LOCK, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        os.write(fd, str(os.getpid()).encode())
+        os.close(fd)
+        return True
+    except FileExistsError:
+        try:
+            if time.time() - os.path.getmtime(_SWEEP_LOCK) > max_age:
+                os.remove(_SWEEP_LOCK)          # lock órfão
+                return _acquire_sweep_lock(max_age)
+        except Exception:
+            pass
+        return False
+    except Exception:
+        return True                              # na dúvida, não trava a limpeza
+
+
+def _release_sweep_lock():
+    try:
+        os.remove(_SWEEP_LOCK)
+    except Exception:
+        pass
+
+
+def _is_job_active(jid, now):
+    """Não apagar job em andamento, por mais antigo que pareça."""
+    j = load_job(jid)
+    if not j:
+        return False
+    return j.get('status') in ('queued', 'rendering')
+
+
+def sweep_old_jobs(ttl_hours=None, force=False):
+    """Apaga jobs mais velhos que o TTL. Devolve quantos removeu.
+
+    force=True ignora o lock (usado no caminho de emergência, onde esperar a
+    próxima janela significaria devolver erro ao usuário).
+    """
+    ttl = JOB_TTL_HOURS if ttl_hours is None else ttl_hours
+    if not force and not _acquire_sweep_lock():
+        return 0
+    now = time.time()
+    cutoff = now - ttl * 3600
+    removed = 0
+    try:
+        for entry in os.scandir(DATA_DIR):
+            name = entry.name
+            if name.startswith('.'):
+                continue
+            try:
+                st = entry.stat()
+                if entry.is_file() and name.endswith('.json'):
+                    jid = name[:-5]
+                    # JSON de tamanho zero é lixo definitivo (sobra do bug antigo
+                    # de truncagem). Com o save atômico isso não se cria mais, mas
+                    # os que já estão no disco precisam sair — cada um é um job
+                    # inacessível ocupando espaço. Sem esperar o TTL.
+                    if st.st_size == 0:
+                        _purge_job(jid)
+                        removed += 1
+                        continue
+                    if st.st_mtime >= cutoff:
+                        continue
+                    if _is_job_active(jid, now):
+                        continue                 # ainda renderizando
+                    _purge_job(jid)
+                    removed += 1
+                elif entry.is_file() and name.endswith(('.tmp', '.part')):
+                    if st.st_mtime < cutoff:     # sobra de crash no meio da escrita
+                        os.remove(entry.path)
+                elif entry.is_dir():
+                    # pasta sem JSON correspondente = órfã de um purge parcial
+                    if not os.path.exists(os.path.join(DATA_DIR, name + '.json')) \
+                            and st.st_mtime < cutoff:
+                        shutil.rmtree(entry.path, ignore_errors=True)
+                        removed += 1
+            except Exception:
+                continue
+    except Exception as e:
+        print('[SWEEP] erro:', e)
+    finally:
+        if not force:
+            _release_sweep_lock()
+    if removed:
+        print('[SWEEP] %d job(s) removidos (TTL=%sh)' % (removed, ttl))
+    return removed
+
+
+def _sweep_loop():
+    while True:
+        time.sleep(SWEEP_EVERY_SECONDS)
+        try:
+            sweep_old_jobs()
+        except Exception as e:
+            print('[SWEEP] loop:', e)
+
+
+def start_sweeper():
+    if not SWEEPER_ENABLED:
+        print('[SWEEP] desligado (VARVID_SWEEPER=off)')
+        return
+    threading.Thread(target=_sweep_loop, daemon=True).start()
+
+
+# ─── GUARDA DE ESPAÇO EM DISCO ────────────────────────────────────────────────
+# Em vez de deixar o os.makedirs estourar OSError (=> 500 em HTML => o front
+# mostra "Unexpected token '<'"), checamos antes e devolvemos JSON legível.
+
+MIN_FREE_MB = float(os.environ.get('VARVID_MIN_FREE_MB', '500'))
+
+
+def free_space_mb():
+    try:
+        return shutil.disk_usage(DATA_DIR).free / (1024 * 1024)
+    except Exception:
+        return float('inf')          # não sabendo medir, não bloqueia
+
+
+def ensure_disk_space():
+    """(ok, livre_mb) — escalando antes de desistir.
+
+    Três degraus, do menos ao mais destrutivo. A recusa educada é o último passo:
+    é infinitamente melhor que o OSError que derrubou o app em 06/09, mas ainda
+    assim significa usuário bloqueado — por isso tentamos liberar antes.
+    """
+    free = free_space_mb()
+    if free >= MIN_FREE_MB:
+        return True, free
+
+    # 1) varredura normal (TTL padrão), ignorando o lock: alguém está esperando.
+    print('[DISCO] %.0f MB livres (mínimo %.0f) — varredura' % (free, MIN_FREE_MB))
+    sweep_old_jobs(force=True)
+    free = free_space_mb()
+    if free >= MIN_FREE_MB:
+        return True, free
+
+    # 2) TTL de emergência, bem mais curto. Nunca toca em job ativo (o
+    #    _is_job_active protege), então ninguém perde uma geração em andamento.
+    print('[DISCO] ainda %.0f MB — TTL de emergência (%sh)' % (free, EMERGENCY_TTL_HOURS))
+    sweep_old_jobs(ttl_hours=EMERGENCY_TTL_HOURS, force=True)
+    free = free_space_mb()
+    if free >= MIN_FREE_MB:
+        return True, free
+
+    # 3) desiste — mas com JSON legível, e deixando rastro pro operador.
+    print('[DISCO] ESGOTADO: %.0f MB livres após limpeza. Aumente o disco no '
+          'Render ou antecipe a migração pra R2/S3.' % free)
+    return False, free
 
 
 def _owned_job(job_id, uid):
@@ -1145,16 +1382,21 @@ def billing_webhook():
     # Renovações e cancelamentos (importante em produção, com o app hospedado).
     if not STRIPE_ENABLED:
         return '', 200
+    # FAIL-CLOSED: sem o signing secret, nenhum evento é processado.
+    # Antes, com STRIPE_WEBHOOK_SECRET vazio, o `else` aceitava JSON não assinado —
+    # qualquer POST com {"type":"invoice.paid",...} creditava créditos na tabela
+    # `profiles` REAL. O modo teste do Stripe protege o dinheiro, não o banco.
+    if not STRIPE_WEBHOOK_SECRET:
+        print('[SEGURANCA] webhook recebido sem STRIPE_WEBHOOK_SECRET configurado — recusado')
+        return jsonify({'error': 'webhook_nao_configurado'}), 400
+
     payload = request.get_data()
     sig = request.headers.get('Stripe-Signature', '')
     try:
-        if STRIPE_WEBHOOK_SECRET:
-            ev = stripe.Webhook.construct_event(payload, sig, STRIPE_WEBHOOK_SECRET)
-            event = ev.to_dict() if hasattr(ev, 'to_dict') else dict(ev)
-        else:
-            event = json.loads(payload)
+        ev = stripe.Webhook.construct_event(payload, sig, STRIPE_WEBHOOK_SECRET)
+        event = ev.to_dict() if hasattr(ev, 'to_dict') else dict(ev)
     except Exception as e:
-        print('[STRIPE] webhook inválido:', e)
+        print('[STRIPE] webhook inválido (assinatura):', e)
         return '', 400
     etype = event.get('type')
     obj = (event.get('data') or {}).get('object') or {}
@@ -1193,13 +1435,18 @@ def analyze():
     cleanup_user(uid)
     if 'files' not in request.files:
         return jsonify({'error': 'no files'}), 400
+
+    ok, free = ensure_disk_space()
+    if not ok:
+        return jsonify({'error': 'sem_espaco', 'free_mb': round(free)}), 507
+
     files = request.files.getlist('files')
     job_id = uuid.uuid4().hex[:12]
     takes_dir = os.path.join(job_dir(job_id), 'takes')
-    os.makedirs(takes_dir, exist_ok=True)
 
     saved_paths = []
     try:
+        os.makedirs(takes_dir, exist_ok=True)
         for f in files:
             if f.filename:
                 path = os.path.join(takes_dir, secure_filename(f.filename))
@@ -1237,10 +1484,20 @@ def analyze():
             'job_id': job_id, 'summary': summary, 'max_combinations': max_unique,
             'avg_duration': avg_duration, 'blocks_found': list(summary.keys()),
         })
+    except OSError as e:
+        # disco cheio / erro de escrita: devolve JSON (nunca 500 em HTML)
+
+        shutil.rmtree(job_dir(job_id), ignore_errors=True)
+        if getattr(e, 'errno', None) == errno.ENOSPC:
+            sweep_old_jobs()
+            return jsonify({'error': 'sem_espaco'}), 507
+        print('[ANALYZE] erro de I/O:', e)
+        return jsonify({'error': 'falha_io'}), 500
     except Exception as e:
         import traceback
+        traceback.print_exc()                       # trace vai pro log, não pro cliente
         shutil.rmtree(job_dir(job_id), ignore_errors=True)
-        return jsonify({'error': str(e), 'trace': traceback.format_exc()}), 500
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/generate', methods=['POST'])
@@ -1334,8 +1591,18 @@ def download(job_id, filename):
 # pelo próprio Modal — não pelo navegador do usuário.
 
 def _check_modal_token():
+    """FAIL-CLOSED: sem segredo definido no modo modal, ninguém entra.
+
+    Antes isto devolvia True quando MODAL_CALLBACK_SECRET estava vazio — um typo
+    no nome da env var (já aconteceu com SUBASE_URL) deixaria /files (ler takes de
+    qualquer job) e /output (escrever arquivo arbitrário no disco) abertos na
+    internet, sem nenhum aviso.
+    """
     if not MODAL_CALLBACK_SECRET:
-        return True
+        if MODAL_ENABLED:
+            print('[SEGURANCA] MODAL_CALLBACK_SECRET vazio — bloqueando callback')
+            return False
+        return True                    # modo local: o Modal nem é usado
     tok = request.args.get('token', '') or request.headers.get('X-Modal-Token', '')
     return tok == MODAL_CALLBACK_SECRET
 
@@ -1357,10 +1624,27 @@ def modal_output_put(job_id, filename):
     if not _check_modal_token():
         return 'forbidden', 403
     out_dir = os.path.join(job_dir(job_id), 'output')
-    os.makedirs(out_dir, exist_ok=True)
     path = os.path.join(out_dir, secure_filename(os.path.basename(filename)))
-    with open(path, 'wb') as f:
-        f.write(request.get_data())
+    tmp = path + '.part'
+    # Escreve em .part e só então renomeia: o /status lista o out_dir e ofereceria
+    # download de um arquivo ainda em transferência (o .part é ignorado no listdir).
+    try:
+        os.makedirs(out_dir, exist_ok=True)
+        with open(tmp, 'wb') as f:
+            f.write(request.get_data())
+        os.replace(tmp, path)
+    except OSError as e:
+
+        try:
+            os.remove(tmp)
+        except Exception:
+            pass
+        if getattr(e, 'errno', None) == errno.ENOSPC:
+            sweep_old_jobs()
+            print('[MODAL] disco cheio ao receber', filename)
+            return jsonify({'error': 'sem_espaco'}), 507
+        print('[MODAL] erro de I/O ao receber %s: %s' % (filename, e))
+        return jsonify({'error': 'falha_io'}), 500
     return jsonify({'ok': True})
 
 
@@ -1401,6 +1685,11 @@ def single_generate():
     cleanup_user(uid)
     if 'files' not in request.files:
         return jsonify({'error': 'no files'}), 400
+
+    ok, free = ensure_disk_space()
+    if not ok:
+        return jsonify({'error': 'sem_espaco', 'free_mb': round(free)}), 507
+
     files = request.files.getlist('files')
     count = int(request.form.get('count', 5))
     headline_text = (request.form.get('headline_text') or '').strip()
@@ -1408,14 +1697,23 @@ def single_generate():
 
     job_id = uuid.uuid4().hex[:12]
     takes_dir = os.path.join(job_dir(job_id), 'takes')
-    os.makedirs(takes_dir, exist_ok=True)
 
     saved = []
-    for f in files:
-        if f.filename:
-            path = os.path.join(takes_dir, secure_filename(f.filename))
-            f.save(path)
-            saved.append(path)
+    try:
+        os.makedirs(takes_dir, exist_ok=True)
+        for f in files:
+            if f.filename:
+                path = os.path.join(takes_dir, secure_filename(f.filename))
+                f.save(path)
+                saved.append(path)
+    except OSError as e:
+
+        shutil.rmtree(job_dir(job_id), ignore_errors=True)
+        if getattr(e, 'errno', None) == errno.ENOSPC:
+            sweep_old_jobs()
+            return jsonify({'error': 'sem_espaco'}), 507
+        print('[SINGLE] erro de I/O:', e)
+        return jsonify({'error': 'falha_io'}), 500
     if not saved:
         shutil.rmtree(job_dir(job_id), ignore_errors=True)
         return jsonify({'error': 'no valid files'}), 400
@@ -1443,6 +1741,17 @@ def single_generate():
     return jsonify({'ok': True, 'job_id': job_id})
 
 
+# ─── BOOT ─────────────────────────────────────────────────────────────────────
+# Fora do __main__ de propósito: em produção quem sobe o app é o gunicorn, que
+# nunca executa o bloco __main__. Sem isto o TTL não rodaria justamente onde é
+# necessário. Uma varredura já na subida limpa o que ficou de antes.
+
+sweep_old_jobs()
+start_sweeper()
+print('[BOOT] TTL=%sh · varredura a cada %ss · espaço livre: %.0f MB'
+      % (JOB_TTL_HOURS, int(SWEEP_EVERY_SECONDS), free_space_mb()))
+
+
 if __name__ == '__main__':
     PORT = int(os.environ.get('PORT', '5001'))   # 5001 evita o conflito com o AirPlay do macOS
     print("=" * 60)
@@ -1460,6 +1769,8 @@ if __name__ == '__main__':
     print(f"  créditos ........ {'ATIVOS (planos: ' + ', '.join(PLANS) + ')' if CREDITS_ENABLED else 'desligados (geração ilimitada)'}")
     print(f"  stripe .......... {'ATIVO (assinaturas)' if STRIPE_ENABLED else 'desligado (sem cobrança)'}")
     print(f"  dados em ........ {DATA_DIR}")
+    print(f"  disco livre ..... {free_space_mb():.0f} MB (mínimo exigido: {MIN_FREE_MB:.0f} MB)")
+    print(f"  TTL dos jobs .... {JOB_TTL_HOURS}h")
     print(f"  abra ............ http://localhost:{PORT}/")
     print(f"  (vídeo único) ... http://localhost:{PORT}/single")
     print("=" * 60)

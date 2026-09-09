@@ -133,9 +133,13 @@ body.ready{opacity:1}
 
 .results{padding:16px;display:none}
 .results.show{display:block}
-.results-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.results-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:8px;flex-wrap:wrap}
 .results-count{font-family:'Syne',sans-serif;font-size:15px;font-weight:700;color:#4ADE80}
+.results-actions{display:flex;gap:8px;align-items:center}
 .btn-all{font-size:11px;color:#000;background:var(--accent);border:none;border-radius:8px;padding:7px 14px;font-weight:700;cursor:pointer}
+.sec-label-row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+.btn-ghost{font-size:11px;color:#999;background:transparent;border:1px solid var(--border2);border-radius:8px;padding:6px 12px;cursor:pointer;font-weight:600;align-items:center}
+.btn-ghost:hover{color:#fff;border-color:#444}
 .results-warn{font-size:11.5px;color:#FBBF24;background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.32);border-radius:9px;padding:9px 12px;margin-bottom:12px;line-height:1.5}
 .res-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
 .res{background:#0e0e0e;border:1px solid var(--border2);border-radius:10px;padding:10px 12px;display:flex;align-items:center;gap:10px}
@@ -197,7 +201,10 @@ body.ready{opacity:1}
 
     <!-- upload (compartilhado) -->
     <div class="sec">
-      <div class="sec-label" data-step="2" id="upload-label">Seus takes</div>
+      <div class="sec-label-row">
+        <div class="sec-label" data-step="2" id="upload-label" style="margin-bottom:0">Seus takes</div>
+        <button class="btn-ghost" id="clearTakesBtn" style="display:none" onclick="clearSelection()">✕ limpar</button>
+      </div>
       <div class="drop" id="drop">
         <input type="file" id="file" accept="video/*,.mov,.mp4,.MOV,.MP4" multiple>
         <div class="drop-ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#E8FF47" stroke-width="1.5" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>
@@ -267,7 +274,12 @@ body.ready{opacity:1}
     </div>
 
     <div class="results" id="results">
-      <div class="results-head"><div class="results-count" id="results-count">0 vídeos prontos</div><button class="btn-all" onclick="downloadAll()">⬇ Baixar todos</button></div>
+      <div class="results-head"><div class="results-count" id="results-count">0 vídeos prontos</div>
+        <div class="results-actions">
+          <button class="btn-ghost" onclick="clearAll()">✕ Limpar</button>
+          <button class="btn-all" onclick="downloadAll()">⬇ Baixar todos</button>
+        </div>
+      </div>
       <div class="results-warn">⚠️ Baixe seus vídeos agora para não perdê-los — eles ficam disponíveis apenas por um tempo.</div>
       <div class="res-grid" id="res-grid"></div>
     </div>
@@ -332,6 +344,66 @@ async function boot(){
 }
 function authHeaders(extra){const h=Object.assign({},extra||{});if(TOKEN)h['Authorization']='Bearer '+TOKEN;return h;}
 async function api(url,opts){opts=opts||{};opts.headers=authHeaders(opts.headers);return fetch(url,opts);}
+
+/* ── CAMADA DE ERRO ────────────────────────────────────────────────────────────
+   Ponto único por onde toda resposta do servidor passa. Antes, cada chamada
+   fazia `await r.json()` direto: quando o Flask devolvia 500 (página HTML), o
+   .json() lançava "Unexpected token '<'" e essa string ia parar num toast na
+   cara do usuário — foi o "erro de token/JSON" reportado no QA.
+   Regra: erro técnico vai pro console, frase em português vai pra tela.       */
+
+const HTTP_MSG={
+  401:'Sua sessão expirou. Recarregue a página e entre de novo.',
+  402:'Créditos insuficientes para esta geração.',
+  404:'Não encontrei esta geração. Ela pode ter expirado.',
+  413:'Arquivo grande demais para envio.',
+  507:'O servidor está sem espaço agora. Tente de novo em alguns minutos.'
+};
+const ERR_MSG={
+  sem_creditos:'Créditos insuficientes. Reduza a quantidade ou faça upgrade do plano.',
+  sem_espaco:'O servidor está sem espaço agora. Tente de novo em alguns minutos.',
+  falha_io:'O servidor não conseguiu gravar seus arquivos. Tente de novo em instantes.',
+  unauthorized:'Sua sessão expirou. Recarregue a página e entre de novo.',
+  'no files':'Nenhum arquivo foi enviado.',
+  'no valid files':'Nenhum vídeo válido. Aceito .mp4, .mov, .avi, .mkv e .webm.',
+  'job not found':'Não encontrei esta geração. Envie os arquivos de novo.',
+  'files not found, please re-upload':'Os arquivos desta geração expiraram. Envie de novo.'
+};
+function httpMessage(status){
+  return HTTP_MSG[status] || (status>=500
+    ? 'O servidor não conseguiu processar agora. Tente de novo em instantes.'
+    : 'Não consegui completar a operação (erro '+status+').');
+}
+/* Traduz qualquer exceção numa frase apresentável. Rede de segurança: mesmo que
+   algum caminho novo escape, o usuário nunca vê stack trace nem "Unexpected token". */
+function friendly(e){
+  const m=(e&&e.message)||'';
+  if(/Failed to fetch|NetworkError|Load failed|ERR_INTERNET/i.test(m))
+    return 'Sem conexão com o servidor. Verifique sua internet e tente de novo.';
+  if(/Unexpected token|not valid JSON|JSON\.parse|SyntaxError/i.test(m))
+    return 'O servidor respondeu de forma inesperada. Tente de novo em instantes.';
+  return m || 'Algo deu errado. Tente de novo.';
+}
+/* Lê a resposta como JSON com segurança. Lança Error com mensagem já em PT. */
+async function readJson(r){
+  const ct=r.headers.get('content-type')||'';
+  let d=null;
+  if(ct.includes('json')){ try{ d=await r.json(); }catch(err){ d=null; } }
+  if(d===null){
+    console.error('[api] resposta não-JSON', r.status, r.url);
+    throw new Error(httpMessage(r.status));
+  }
+  if(d.error){
+    console.error('[api] erro do servidor', r.status, d.error);
+    const err=new Error(ERR_MSG[d.error] || errText(d));
+    err.code=d.error; err.data=d;
+    throw err;
+  }
+  if(!r.ok) throw new Error(httpMessage(r.status));
+  return d;
+}
+/* Faz a chamada e já devolve o JSON validado. */
+async function apiJson(url,opts){ return readJson(await api(url,opts)); }
 async function logout(){ if(sb) await sb.auth.signOut(); location.href='/login'; }
 async function refreshMe(){
   try{
@@ -363,10 +435,11 @@ function openPlans(){
 function closePlans(){ $('plansModal').classList.remove('show'); }
 async function subscribe(key){
   try{
-    const r=await api('/billing/checkout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({plan:key})});
-    const d=await r.json();
-    if(d.url){ window.location.href=d.url; } else { toast('Erro ao iniciar o checkout: '+(d.error||''),true); }
-  }catch(e){ toast('Falha no checkout: '+e.message,true); }
+    const d=await apiJson('/billing/checkout',{method:'POST',
+      headers:{'Content-Type':'application/json'},body:JSON.stringify({plan:key})});
+    if(d.url){ window.location.href=d.url; }
+    else { toast('Não consegui iniciar o pagamento. Tente de novo em instantes.',true); }
+  }catch(e){ toast(friendly(e),true); }
 }
 
 function setMode(m){
@@ -377,13 +450,16 @@ function setMode(m){
   $('naming-sec').style.display = single?'none':'block';
   $('upload-label').textContent = single?'Seu vídeo':'Seus takes';
   $('drop-main').textContent = single?'Arraste 1 vídeo pronto':'Arraste seus takes aqui';
-  $('drop-sub').textContent = single?'.mp4 · .mov — ou vários pra gerar em lote':'ou clique para selecionar';
+  // QA #6: "ou vários pra gerar em lote" contradizia o nome do modo. O backend
+  // aceita mais de um arquivo e alterna entre eles (files[i % len]) — o texto
+  // agora diz exatamente isso, em vez de prometer lote.
+  $('drop-sub').textContent = single?'.mp4 · .mov — 1 vídeo (mais de um alterna entre eles)':'ou clique para selecionar';
   $('remix-right').style.display = single?'none':'block';
   $('single-right').style.display = single?'block':'none';
-  selectedFiles=[]; $('file').value=''; $('badge').className='badge'; $('go').disabled=true;
+  clearSelection();
   showEmpty(true);
 }
-function resetJob(){ if(poll){clearInterval(poll);poll=null;} jobId=null; results=[]; $('prog').className='prog'; $('results').className='results'; }
+function resetJob(){ if(poll){clearInterval(poll);poll=null;} jobId=null; results=[]; $('prog').className='prog'; $('results').className='results'; $('res-grid').innerHTML=''; }
 function showEmpty(v){ $('empty').style.display = v?'flex':'none'; }
 function toggleNaming(){ $('naming-hdr').classList.toggle('open'); $('naming-body').classList.toggle('open'); }
 
@@ -400,9 +476,13 @@ function wire(){
 
 function onFiles(fl){
   const exts=['.mp4','.mov','.avi','.mkv','.webm'];
-  selectedFiles=Array.from(fl).filter(f=>exts.some(x=>f.name.toLowerCase().endsWith(x)));
-  $('fcount').textContent=selectedFiles.length;
+  const all=Array.from(fl);
+  selectedFiles=all.filter(f=>exts.some(x=>f.name.toLowerCase().endsWith(x)));
+  const rejeitados=all.length-selectedFiles.length;
+  $('badge').innerHTML='✦ <span id="fcount">'+selectedFiles.length+'</span> arquivo(s)';
   $('badge').className = selectedFiles.length?'badge show':'badge';
+  updateClearButtons();
+  if(rejeitados>0) toast(rejeitados+' arquivo(s) ignorado(s) — aceito .mp4, .mov, .avi, .mkv e .webm.',true);
   if(!selectedFiles.length){ $('go').disabled=true; return; }
   if(mode==='remix'){ analyze(); }
   else { $('go').disabled=false; showEmpty(false); }
@@ -413,14 +493,21 @@ async function analyze(){
   $('badge').innerHTML='<span class="spin"></span> analisando…'; $('badge').className='badge show';
   const fd=new FormData(); selectedFiles.forEach(f=>fd.append('files',f,f.name));
   try{
-    const r=await api('/analyze',{method:'POST',body:fd});
-    const d=await r.json();
-    if(d.error){ toast('Erro ao analisar: '+d.error,true); $('badge').className='badge'; return; }
+    const d=await apiJson('/analyze',{method:'POST',body:fd});
     jobId=d.job_id;
     renderStructure(d.summary||{}, d.max_combinations||1);
     $('badge').innerHTML='✦ '+selectedFiles.length+' arquivo(s)'; $('badge').className='badge show';
     $('go').disabled=false; showEmpty(false);
-  }catch(e){ toast('Falha na análise: '+e.message,true); $('badge').className='badge'; }
+    // Nenhum bloco reconhecido => o render sairia com 0 vídeos e ainda cobraria
+    // os créditos. Melhor barrar aqui e explicar o que fazer.
+    if(!Object.keys(d.summary||{}).length){
+      $('go').disabled=true;
+      toast('Não reconheci nenhum bloco nos nomes dos arquivos. Renomeie para Hook1, CTA1, Story… (abra o guia acima).',true,0);
+    }
+  }catch(e){
+    toast(friendly(e),true);
+    $('badge').className='badge'; $('go').disabled=true;
+  }
 }
 
 const BLOCK_ORDER=['hook','story','revelacao','prova','cta'];
@@ -454,37 +541,76 @@ async function generate(){
   try{
     if(mode==='single'){
       $('single-count').textContent=count;
+      // No modo single o upload só acontece agora — pode demorar. Sem aviso, a
+      // tela ficava muda (QA #4).
+      $('prog').className='prog show';
+      $('prog-label').textContent='Enviando seu vídeo…';
+      $('p-total').textContent=count; $('p-done').textContent=0; $('fill').style.width='0%';
       const fd=new FormData(); selectedFiles.forEach(f=>fd.append('files',f,f.name));
       fd.append('count',count); fd.append('headline_text',headline); fd.append('headline_duration',hd);
-      const r=await api('/single/generate',{method:'POST',body:fd});
-      const d=await r.json(); if(d.error){ toast(errText(d),true); resetBtn(); return; }
+      const d=await apiJson('/single/generate',{method:'POST',body:fd});
       jobId=d.job_id;
     }else{
       if(!jobId){ toast('Envie os takes primeiro.',true); resetBtn(); return; }
-      const r=await api('/generate',{method:'POST',headers:{'Content-Type':'application/json'},
+      const d=await apiJson('/generate',{method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({job_id:jobId,count,headline_text:headline,headline_duration:hd})});
-      const d=await r.json(); if(d.error){ toast(errText(d),true); resetBtn(); return; }
     }
     startPolling();
-  }catch(e){ toast('Falha ao gerar: '+e.message,true); resetBtn(); }
+  }catch(e){
+    toast(friendly(e),true);
+    $('prog').className='prog';
+    resetBtn();
+    if(e.code==='sem_creditos') refreshMe();
+  }
 }
 function resetBtn(){ $('go').disabled=false; $('go').textContent='▶ GERAR VARIAÇÕES'; }
 function errText(d){ if(d.error==='sem_creditos'){ return 'Créditos insuficientes'+(d.credits!=null?' ('+d.credits+' restantes)':'')+'. Reduza a quantidade ou faça upgrade do plano.'; } return 'Erro: '+d.error; }
 
+/* O polling antigo engolia TODO erro em silêncio ("ignora blips de rede").
+   Quando o /status passou a devolver 500 permanente (JSON de job corrompido),
+   a barra congelava e nada acontecia nunca — daí o "sempre tenho que dar F5"
+   do QA. Agora: blip tolerado, falha persistente encerra e avisa.            */
+const POLL_MAX_FAILS=6;          // ~9s de tolerância a 1,5s por tentativa
 function startPolling(){
   $('prog').className='prog show'; $('p-total').textContent=count; $('p-done').textContent=0; $('fill').style.width='0%';
+  $('prog-label').textContent='Renderizando…';
+  let fails=0;
+  const stop=()=>{ if(poll){clearInterval(poll); poll=null;} };
   poll=setInterval(async()=>{
+    let st;
     try{
-      const st=await (await api('/status/'+jobId)).json();
-      const done=st.completed||0;
-      $('p-done').textContent=done; $('fill').style.width=(st.progress||0)+'%';
-      $('prog-label').textContent = st.status==='done'?'Concluído':'Renderizando…';
-      if((st.files||[]).length!==results.length){ results=st.files||[]; renderResults(); }
-      if(st.status==='done'||st.status==='error'){
-        clearInterval(poll); poll=null; resetBtn(); refreshMe();
-        if(st.status==='error') toast('Erro no render: '+(st.error||''),true);
+      st=await apiJson('/status/'+jobId);
+      fails=0;
+    }catch(e){
+      fails++;
+      console.warn('[status] falha '+fails+'/'+POLL_MAX_FAILS, e);
+      if(fails>=POLL_MAX_FAILS){
+        stop(); resetBtn();
+        $('prog-label').textContent='Interrompido';
+        toast('Perdi o contato com esta geração. '+friendly(e)+' Toque em "Limpar" e tente de novo. (toque para fechar)',true,0);
       }
-    }catch(e){/* ignora blips de rede */}
+      return;
+    }
+    if(st.status==='not_found'){
+      stop(); resetBtn();
+      $('prog').className='prog';
+      toast('Esta geração não existe mais no servidor. Envie os arquivos de novo.',true);
+      clearLastJob();
+      return;
+    }
+    const done=st.completed||0;
+    $('p-done').textContent=done; $('fill').style.width=(st.progress||0)+'%';
+    $('prog-label').textContent = st.status==='done'?'Concluído':'Renderizando…';
+    if((st.files||[]).length!==results.length){ results=st.files||[]; renderResults(); }
+    if(st.status==='done'||st.status==='error'){
+      stop(); resetBtn(); refreshMe();
+      if(st.status==='error'){
+        toast('A geração falhou. '+(st.error||'Tente de novo em instantes.'),true);
+      }else if(!results.length){
+        // terminou "com sucesso" e zero arquivos: takes irreconhecíveis
+        toast('A geração terminou sem nenhum vídeo. Confira os nomes dos arquivos (Hook1, CTA1, Story…) e tente de novo.',true,0);
+      }
+    }
   },1500);
 }
 
@@ -499,26 +625,65 @@ function renderResults(){
 async function dl(f){
   try{
     const r=await api('/download/'+jobId+'/'+f);
-    if(!r.ok){ toast('Não consegui baixar '+f,true); return; }
+    if(!r.ok){ toast(httpMessage(r.status),true); return; }
     const b=await r.blob(); const u=URL.createObjectURL(b);
     const a=document.createElement('a'); a.href=u; a.download=f; document.body.appendChild(a); a.click(); a.remove();
     setTimeout(()=>URL.revokeObjectURL(u),4000);
-  }catch(e){ toast('Falha no download: '+e.message,true); }
+  }catch(e){ toast(friendly(e),true); }
 }
 async function downloadAll(){ for(const f of results){ await dl(f); await new Promise(r=>setTimeout(r,400)); } }
 
+/* ── LIMPAR ────────────────────────────────────────────────────────────────────
+   O endpoint /admin/clear já existia no backend desde sempre e o front nunca o
+   chamava. Os dois pedidos de "botão de limpar" do QA eram só isto.
+   De quebra resolve o F5: o input de arquivo é zerado, então reselecionar o
+   MESMO arquivo volta a disparar o evento 'change' (o browser não dispara
+   quando o valor não muda).                                                   */
+
+function clearSelection(){          // só a seleção local, não mexe no servidor
+  selectedFiles=[];
+  $('file').value='';               // <- é isto que devolve o evento 'change'
+  $('badge').innerHTML='✦ <span id="fcount">0</span> arquivo(s)';
+  $('badge').className='badge';
+  $('go').disabled=true;
+  updateClearButtons();
+}
+
+async function clearAll(){          // seleção + resultados + arquivos no servidor
+  if(poll){ clearInterval(poll); poll=null; }
+  try{ await api('/admin/clear',{method:'POST'}); }
+  catch(e){ console.warn('[clear] servidor não respondeu', e); }
+  clearSelection();
+  jobId=null; results=[];
+  $('results').className='results';
+  $('res-grid').innerHTML='';
+  $('prog').className='prog';
+  clearLastJob();
+  resetBtn();
+  showEmpty(true);
+  if(mode==='remix'){ renderStructure({},'—'); }
+  refreshMe();
+  toast('Tudo limpo. Pode começar de novo.');
+}
+
+function updateClearButtons(){
+  const b=$('clearTakesBtn');
+  if(b) b.style.display = selectedFiles.length ? 'inline-flex' : 'none';
+}
+
 // Lembra a última geração pra sobreviver a um reload sem querer
 function saveLastJob(){ try{ if(jobId) localStorage.setItem('varvid_last_job', JSON.stringify({jobId:jobId, ts:Date.now()})); }catch(e){} }
+function clearLastJob(){ try{ localStorage.removeItem('varvid_last_job'); }catch(e){} }
 async function restoreLastJob(){
   let saved=null; try{ saved=JSON.parse(localStorage.getItem('varvid_last_job')||'null'); }catch(e){}
   if(!saved || !saved.jobId) return;
-  try{
-    const st=await (await api('/status/'+saved.jobId)).json();
-    const files=st.files||[];
-    if(st.status==='not_found' || (!files.length && st.status!=='rendering')){ localStorage.removeItem('varvid_last_job'); return; }
-    jobId=saved.jobId; results=files; renderResults(); showEmpty(false);
-    if(st.status==='rendering'){ startPolling(); }   // retoma se ainda estava gerando
-  }catch(e){}
+  let st;
+  try{ st=await apiJson('/status/'+saved.jobId); }
+  catch(e){ clearLastJob(); return; }          // job sumiu ou deu erro: começa limpo
+  const files=st.files||[];
+  if(st.status==='not_found' || (!files.length && st.status!=='rendering')){ clearLastJob(); return; }
+  jobId=saved.jobId; results=files; renderResults(); showEmpty(false);
+  if(st.status==='rendering'){ startPolling(); }   // retoma se ainda estava gerando
 }
 
 boot();

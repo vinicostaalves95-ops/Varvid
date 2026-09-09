@@ -1,0 +1,8 @@
+supabase_config.json
+.env
+data/
+*.mp4
+*.mov
+.venv/
+__pycache__/
+.DS_Store

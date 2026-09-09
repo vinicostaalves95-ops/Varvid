@@ -1,0 +1,9 @@
+# Obrigatórios
+flask>=3.0
+werkzeug>=3.0
+
+# Opcionais — habilitam o zoom com detecção de rosto.
+# Se não instalar, o app funciona igual (zoom centralizado, sem face-tracking).
+opencv-python-headless>=4.8
+mediapipe==0.10.9
+numpy

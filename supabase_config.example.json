@@ -1,0 +1,5 @@
+{
+  "_instrucoes": "Renomeie este arquivo para supabase_config.json e cole suas 2 chaves. Enquanto o arquivo real (supabase_config.json) nao existir, o app roda em modo local (sem login).",
+  "url": "https://SEU-PROJETO.supabase.co",
+  "anon_key": "COLE_AQUI_A_ANON_PUBLIC_KEY_eyJ..."
+}
