@@ -142,6 +142,14 @@ body.ready{opacity:1}
 .sec-label-row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
 .btn-ghost{font-size:11px;color:#999;background:transparent;border:1px solid var(--border2);border-radius:8px;padding:6px 12px;cursor:pointer;font-weight:600;align-items:center}
 .btn-ghost:hover{color:#fff;border-color:#444}
+.gen-row{display:flex;gap:8px}
+.gen-row .btn-gen{flex:1}
+.btn-clear-all{flex-shrink:0;height:48px;padding:0 14px;border-radius:8px}
+.dur-line{margin-top:10px;font-size:11.5px;line-height:1.5;display:none}
+.dur-line.show{display:block}
+.dur-line.ok{color:#4ADE80}
+.dur-line.over{color:#FBBF24}
+.dur-line .sub{color:var(--muted);font-size:11px;display:block;margin-top:2px}
 .results-warn{font-size:11.5px;color:#FBBF24;background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.32);border-radius:9px;padding:9px 12px;margin-bottom:12px;line-height:1.5}
 .res-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
 .res{background:#0e0e0e;border:1px solid var(--border2);border-radius:10px;padding:10px 12px;display:flex;align-items:center;gap:10px}
@@ -236,7 +244,18 @@ body.ready{opacity:1}
       </div>
     </div>
 
-    <div class="gen-wrap"><button class="btn-gen" id="go" disabled>▶ GERAR VARIAÇÕES</button></div>
+    <div class="gen-wrap">
+      <!-- O "Limpar" MORAVA dentro do bloco de resultados, que só aparece quando
+           existe pelo menos um vídeo pronto. Ou seja: sumia exatamente quando a
+           geração falhava sem produzir nada — justo quando é necessário pra
+           destravar. Um testador ficou 45 min preso por causa disso. Agora vive
+           aqui, ao lado do GERAR, sempre visível. -->
+      <div class="gen-row">
+        <button class="btn-gen" id="go" disabled>▶ GERAR VARIAÇÕES</button>
+        <button class="btn-ghost btn-clear-all" onclick="clearAll()" title="Limpa a seleção, os resultados e os arquivos no servidor">✕ Limpar</button>
+      </div>
+      <div class="dur-line" id="dur-line"></div>
+    </div>
   </div>
 
   <div class="right">
@@ -310,6 +329,50 @@ body.ready{opacity:1}
 let cfg=null, sb=null, TOKEN=null;
 let mode='remix', count=5, selectedFiles=[], jobId=null, poll=null, results=[];
 const $=id=>document.getElementById(id);
+
+/* ── LIMITE DE DURAÇÃO ─────────────────────────────────────────────────────────
+   A conta que importa é em SEGUNDOS, não em megabytes: o render normaliza tudo
+   para 1080×1920, então o peso do arquivo final vem da duração, não do peso do
+   que entrou. Um vídeo de 5 min pesa ~50 MB na entrada e gera ~675 MB de saída.
+
+   O limite é verificado AQUI, antes de enviar qualquer byte — o navegador lê a
+   duração nos metadados do arquivo. Assim a pessoa descobre na hora, em vez de
+   esperar o upload inteiro para receber um erro (foi o que travou um testador).
+   Os valores vêm do servidor via /auth-config.json.                            */
+let LIM = {maxVideoSeconds:90, maxFileMB:100, maxUploadMB:200};
+
+function fmtDur(s){
+  s=Math.round(s);
+  if(s<60) return s+'s';
+  const m=Math.floor(s/60), r=s%60;
+  return r? m+'min'+String(r).padStart(2,'0') : m+'min';
+}
+/* Lê a duração do arquivo sem enviá-lo. Devolve null se o navegador não souber
+   (codec exótico) — nesse caso não bloqueamos: o servidor ainda tem a guarda. */
+function lerDuracao(file){
+  return new Promise(resolve=>{
+    const url=URL.createObjectURL(file), v=document.createElement('video');
+    const limpa=()=>{ URL.revokeObjectURL(url); };
+    const t=setTimeout(()=>{ limpa(); resolve(null); },8000);
+    v.preload='metadata';
+    v.onloadedmetadata=()=>{ clearTimeout(t); const d=v.duration; limpa();
+      resolve(isFinite(d)&&d>0 ? d : null); };
+    v.onerror=()=>{ clearTimeout(t); limpa(); resolve(null); };
+    v.src=url;
+  });
+}
+function mostrarDuracao(segundos, contexto){
+  const el=$('dur-line');
+  if(segundos==null){ el.className='dur-line'; return true; }
+  const limite=LIM.maxVideoSeconds, ok=segundos<=limite;
+  el.className='dur-line show '+(ok?'ok':'over');
+  el.innerHTML = ok
+    ? '✓ '+contexto+' <b>'+fmtDur(segundos)+'</b><span class="sub">dentro do limite de '+fmtDur(limite)+'</span>'
+    : '⚠ '+contexto+' <b>'+fmtDur(segundos)+'</b><span class="sub">acima do limite de '+fmtDur(limite)+'. '
+      +(mode==='single'?'Corte o vídeo antes de subir.':'Corte um dos blocos ou grave takes mais curtos.')+'</span>';
+  return ok;
+}
+function limparDuracao(){ $('dur-line').className='dur-line'; $('dur-line').innerHTML=''; }
 let _toastTimer=null;
 function toast(t,err,ms){
   const e=$('toast');
@@ -322,6 +385,7 @@ function toast(t,err,ms){
 
 async function boot(){
   try{ cfg = await (await fetch('/auth-config.json')).json(); }catch(e){ cfg={authEnabled:false}; }
+  if(cfg && cfg.limits) LIM = Object.assign(LIM, cfg.limits);
   if(cfg.authEnabled){
     if(typeof supabase==='undefined'){
       $('gate').innerHTML='<div style="text-align:center;color:#aaa;font-size:14px;max-width:340px;line-height:1.6">Não consegui carregar a biblioteca de login.<br>Verifique sua internet e recarregue a página.</div>';
@@ -369,6 +433,7 @@ const ERR_MSG={
   sem_creditos:'Créditos insuficientes. Reduza a quantidade ou faça upgrade do plano.',
   sem_espaco:'O servidor está sem espaço agora. Tente de novo em alguns minutos.',
   geracao_em_andamento:'Você já tem uma geração em andamento. Espere ela terminar, ou use "Limpar" para cancelar e começar de novo.',
+  arquivo_grande_demais:'O envio ficou grande demais. Envie menos arquivos por vez, ou vídeos mais curtos.',
   falha_io:'O servidor não conseguiu gravar seus arquivos. Tente de novo em instantes.',
   unauthorized:'Sua sessão expirou. Recarregue a página e entre de novo.',
   'no files':'Nenhum arquivo foi enviado.',
@@ -489,11 +554,12 @@ function wire(){
   $('go').addEventListener('click',generate);
 }
 
-function onFiles(fl){
+async function onFiles(fl){
   if(gerando){   // trava também o arrastar-e-soltar, que ignora input.disabled
     toast(ERR_MSG.geracao_em_andamento,true);
     return;
   }
+  limparDuracao();
   const exts=['.mp4','.mov','.avi','.mkv','.webm'];
   const all=Array.from(fl);
   selectedFiles=all.filter(f=>exts.some(x=>f.name.toLowerCase().endsWith(x)));
@@ -515,6 +581,31 @@ function onFiles(fl){
     toast('O modo Vídeo único usa 1 vídeo por vez — mantive "'+selectedFiles[0].name+'" e ignorei os outros '+excedentes+'. Para juntar takes, use a aba Remix de takes.',true,0);
   }
   if(!selectedFiles.length){ $('go').disabled=true; return; }
+
+  // Peso: rede de segurança secundária. Não é o número que a pessoa vê na tela,
+  // só aparece quando alguém esbarra nele.
+  const pesados=selectedFiles.filter(f=>f.size > LIM.maxFileMB*1024*1024);
+  if(pesados.length){
+    toast('"'+pesados[0].name+'" tem '+Math.round(pesados[0].size/1048576)+' MB — o limite por arquivo é '+LIM.maxFileMB+' MB.',true,0);
+    clearSelection(); return;
+  }
+  const totalMB=selectedFiles.reduce((a,f)=>a+f.size,0)/1048576;
+  if(totalMB > LIM.maxUploadMB){
+    toast('Seus arquivos somam '+Math.round(totalMB)+' MB e o envio aceita até '+LIM.maxUploadMB+' MB. Envie menos takes por vez.',true,0);
+    clearSelection(); return;
+  }
+
+  // Modo único: a duração é conferida ANTES do upload. É o ponto em que o
+  // testador travou — subiu 5 min, esperou, e só então deu erro.
+  if(mode==='single'){
+    $('badge').innerHTML='<span class="spin"></span> conferindo…'; $('badge').className='badge show';
+    const dur=await lerDuracao(selectedFiles[0]);
+    $('badge').innerHTML='✦ <span id="fcount">1</span> arquivo(s)'; $('badge').className='badge show';
+    if(!mostrarDuracao(dur,'Seu vídeo tem')){
+      $('go').disabled=true;                     // nada é enviado
+      return;
+    }
+  }
   if(mode==='remix'){ analyze(); }
   else { $('go').disabled=false; showEmpty(false); }
 }
@@ -534,11 +625,28 @@ async function analyze(){
     if(!Object.keys(d.summary||{}).length){
       $('go').disabled=true;
       toast('Não reconheci nenhum bloco nos nomes dos arquivos. Renomeie para Hook1, CTA1, Story… (abra o guia acima).',true,0);
+      return;
     }
+    // O vídeo final é UM take de cada bloco, não a soma de tudo que subiu.
+    // Somar os uploads daria um número assustador e errado. O /analyze já
+    // devolve a duração de cada variante — aqui pegamos o pior caso (a variante
+    // mais longa de cada bloco), que é o que pode estourar o limite.
+    if(!mostrarDuracao(duracaoMontada(d.summary), 'Seu vídeo vai ter até')) $('go').disabled=true;
   }catch(e){
     toast(friendly(e),true);
     $('badge').className='badge'; $('go').disabled=true;
   }
+}
+
+/* Pior caso do vídeo montado: a variante mais longa de cada bloco. Devolve null
+   se o servidor não conseguiu medir (ffprobe ausente), e aí nada é bloqueado. */
+function duracaoMontada(summary){
+  let total=0, mediu=false;
+  Object.values(summary||{}).forEach(variantes=>{
+    const maior=Math.max(...variantes.map(v=>v.duration||0));
+    if(maior>0){ total+=maior; mediu=true; }
+  });
+  return mediu ? total : null;
 }
 
 const BLOCK_ORDER=['hook','story','revelacao','prova','cta'];
@@ -683,9 +791,19 @@ function clearSelection(){          // só a seleção local, não mexe no servi
 
 async function clearAll(){          // seleção + resultados + arquivos no servidor
   if(poll){ clearInterval(poll); poll=null; }
-  try{ await api('/admin/clear',{method:'POST'}); }
-  catch(e){ console.warn('[clear] servidor não respondeu', e); }
+
+  // A limpeza do SERVIDOR é o que destrava uma nova geração. Antes o erro era
+  // engolido e a tela dizia "Tudo limpo" de qualquer jeito — a pessoa achava que
+  // tinha resolvido e continuava barrada, sem entender por quê.
+  let servidorOk=false;
+  try{
+    const r=await api('/admin/clear',{method:'POST'});
+    servidorOk = r.ok;
+    if(!r.ok) console.error('[clear] servidor recusou', r.status);
+  }catch(e){ console.error('[clear] servidor não respondeu', e); }
+
   clearSelection();
+  limparDuracao();
   jobId=null; results=[];
   $('results').className='results';
   $('res-grid').innerHTML='';
@@ -695,7 +813,9 @@ async function clearAll(){          // seleção + resultados + arquivos no serv
   showEmpty(true);
   if(mode==='remix'){ renderStructure({},'—'); }
   refreshMe();
-  toast('Tudo limpo. Pode começar de novo.');
+
+  if(servidorOk) toast('Tudo limpo. Pode começar de novo.');
+  else toast('Limpei esta tela, mas não consegui falar com o servidor — se ainda aparecer "geração em andamento", aguarde um instante e tente de novo.',true,0);
 }
 
 function updateClearButtons(){

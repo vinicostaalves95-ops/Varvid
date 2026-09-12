@@ -828,7 +828,36 @@ def run_single_job(job_id, count, headline_text, headline_duration):
 # ─── FLASK APP ────────────────────────────────────────────────────────────────
 
 app = Flask(__name__)
-app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024 * 1024  # 2 GB
+
+# ─── LIMITES DE ENVIO ─────────────────────────────────────────────────────────
+# Eram 2 GB — num servidor com 512 MB de RAM e 974 MB de disco. Um vídeo de 5
+# minutos passava tranquilo na entrada (~50 MB) e só estourava na SAÍDA: o render
+# normaliza tudo pra 1080×1920, e 5 variações de 5 min dão ~675 MB. Foi assim que
+# um teste travou a conta inteira.
+#
+# Quem manda de verdade é a DURAÇÃO, não o peso do arquivo — o tamanho da saída é
+# proporcional aos segundos de vídeo, não aos megabytes que entraram. O limite de
+# duração é aplicado no navegador (que lê os metadados antes de enviar qualquer
+# byte); os limites daqui são a rede de segurança de quem burlar o front.
+MAX_VIDEO_SECONDS = float(os.environ.get('VARVID_MAX_VIDEO_SECONDS', '90'))
+MAX_UPLOAD_MB     = float(os.environ.get('VARVID_MAX_UPLOAD_MB', '200'))    # requisição inteira
+MAX_FILE_MB       = float(os.environ.get('VARVID_MAX_FILE_MB', '100'))      # por arquivo
+# Estimativa de saída por variação, medida nos vídeos reais: ~0,45 MB por segundo
+# de vídeo a 1080×1920. No teto de 90s dá ~40 MB; uso 45 pra ter folga.
+EST_MB_POR_VARIACAO = float(os.environ.get('VARVID_EST_MB_VARIACAO', '45'))
+
+app.config['MAX_CONTENT_LENGTH'] = int(MAX_UPLOAD_MB * 1024 * 1024)
+
+
+@app.errorhandler(413)
+def _too_large(e):
+    """413 em JSON.
+
+    Sem isto, estourar o MAX_CONTENT_LENGTH devolveria a página HTML padrão do
+    Flask — e o front, ao tentar ler como JSON, mostraria "Unexpected token '<'".
+    Seria recriar exatamente o bug que acabamos de corrigir, por outra porta.
+    """
+    return jsonify({'error': 'arquivo_grande_demais', 'limite_mb': MAX_UPLOAD_MB}), 413
 UI_HTML = open(UI_HTML_PATH).read() if os.path.exists(UI_HTML_PATH) else '<h1>ui.html não encontrado</h1>'
 
 
@@ -1285,22 +1314,28 @@ def free_space_mb():
         return float('inf')          # não sabendo medir, não bloqueia
 
 
-def ensure_disk_space():
+def ensure_disk_space(variacoes=0):
     """(ok, livre_mb) — escalando antes de desistir.
+
+    `variacoes` é quantos vídeos SERÃO gerados. Sem isso a conta olhava só o que
+    estava entrando e ignorava o que ia sair — e a saída é o que enche o disco:
+    5 variações de um vídeo de 5 min dão ~675 MB a partir de um upload de 50 MB.
+    Foi essa cegueira que travou a conta de um testador.
 
     Três degraus, do menos ao mais destrutivo. A recusa educada é o último passo:
     é infinitamente melhor que o OSError que derrubou o app em 06/09, mas ainda
     assim significa usuário bloqueado — por isso tentamos liberar antes.
     """
+    preciso = MIN_FREE_MB + variacoes * EST_MB_POR_VARIACAO
     free = free_space_mb()
-    if free >= MIN_FREE_MB:
+    if free >= preciso:
         return True, free
 
     # 1) varredura normal (TTL padrão), ignorando o lock: alguém está esperando.
-    print('[DISCO] %.0f MB livres (mínimo %.0f) — varredura' % (free, MIN_FREE_MB))
+    print('[DISCO] %.0f MB livres, preciso de %.0f — varredura' % (free, preciso))
     sweep_old_jobs(force=True)
     free = free_space_mb()
-    if free >= MIN_FREE_MB:
+    if free >= preciso:
         return True, free
 
     # 2) TTL de emergência, bem mais curto. Nunca toca em job ativo (o
@@ -1308,12 +1343,12 @@ def ensure_disk_space():
     print('[DISCO] ainda %.0f MB — TTL de emergência (%sh)' % (free, EMERGENCY_TTL_HOURS))
     sweep_old_jobs(ttl_hours=EMERGENCY_TTL_HOURS, force=True)
     free = free_space_mb()
-    if free >= MIN_FREE_MB:
+    if free >= preciso:
         return True, free
 
     # 3) desiste — mas com JSON legível, e deixando rastro pro operador.
-    print('[DISCO] ESGOTADO: %.0f MB livres após limpeza. Aumente o disco no '
-          'Render ou antecipe a migração pra R2/S3.' % free)
+    print('[DISCO] ESGOTADO: %.0f MB livres, precisava de %.0f. Aumente o disco no '
+          'Render ou antecipe a migração pra R2/S3.' % (free, preciso))
     return False, free
 
 
@@ -1353,6 +1388,13 @@ def auth_config():
         'authEnabled': AUTH_ENABLED,
         'url': SUPABASE_URL if AUTH_ENABLED else '',
         'anonKey': SUPABASE_ANON_KEY if AUTH_ENABLED else '',
+        # Limites vêm do servidor pra não ficarem duplicados no HTML: mudar a
+        # env var no Render passa a valer na tela sem novo deploy do front.
+        'limits': {
+            'maxVideoSeconds': MAX_VIDEO_SECONDS,
+            'maxFileMB': MAX_FILE_MB,
+            'maxUploadMB': MAX_UPLOAD_MB,
+        },
     })
 
 
@@ -1599,6 +1641,13 @@ def generate():
     if not os.path.exists(takes_dir):
         return jsonify({'error': 'files not found, please re-upload'}), 404
 
+    # Espaço pra SAÍDA. Antes só o upload era verificado — e é a saída que enche
+    # o disco. Checar ANTES de cobrar crédito: recusar depois de debitar seria
+    # cobrar por algo que nunca vai existir.
+    ok, free = ensure_disk_space(variacoes=count)
+    if not ok:
+        return jsonify({'error': 'sem_espaco', 'free_mb': round(free)}), 507
+
     if CREDITS_ENABLED:
         ok, rem, err = charge_credits(uid, count)
         if err == 'sem_creditos':
@@ -1770,14 +1819,15 @@ def single_generate():
     if 'files' not in request.files:
         return jsonify({'error': 'no files'}), 400
 
-    ok, free = ensure_disk_space()
-    if not ok:
-        return jsonify({'error': 'sem_espaco', 'free_mb': round(free)}), 507
-
     files = request.files.getlist('files')
     count = int(request.form.get('count', 5))
     headline_text = (request.form.get('headline_text') or '').strip()
     headline_duration = int(request.form.get('headline_duration', 3))
+
+    # Aqui já sabemos quantas variações saem — dá pra reservar o espaço delas.
+    ok, free = ensure_disk_space(variacoes=count)
+    if not ok:
+        return jsonify({'error': 'sem_espaco', 'free_mb': round(free)}), 507
 
     job_id = uuid.uuid4().hex[:12]
     takes_dir = os.path.join(job_dir(job_id), 'takes')
