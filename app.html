@@ -150,7 +150,10 @@ body.ready{opacity:1}
 .dur-line.ok{color:#4ADE80}
 .dur-line.over{color:#FBBF24}
 .dur-line .sub{color:var(--muted);font-size:11px;display:block;margin-top:2px}
-.results-warn{font-size:11.5px;color:#FBBF24;background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.32);border-radius:9px;padding:9px 12px;margin-bottom:12px;line-height:1.5}
+/* Era âmbar de alerta ("baixe agora para não perdê-los"). Com prazo definido a
+   informação deixou de ser um susto e virou um fato — tom neutro combina mais. */
+.results-warn{font-size:11.5px;color:var(--muted);background:#0e0e0e;border:1px solid var(--border2);border-radius:9px;padding:9px 12px;margin-bottom:12px;line-height:1.5}
+.results-warn b{color:#ddd}
 .res-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
 .res{background:#0e0e0e;border:1px solid var(--border2);border-radius:10px;padding:10px 12px;display:flex;align-items:center;gap:10px}
 .res .n{flex:1;font-size:12px;font-weight:600}
@@ -306,7 +309,7 @@ body.ready{opacity:1}
           <button class="btn-all" onclick="downloadAll()">⬇ Baixar todos</button>
         </div>
       </div>
-      <div class="results-warn">⚠️ Baixe seus vídeos agora para não perdê-los — eles ficam disponíveis apenas por um tempo.</div>
+      <div class="results-warn" id="results-warn">Seus vídeos ficam disponíveis por <b>48 horas</b>. Depois disso são apagados automaticamente.</div>
       <div class="res-grid" id="res-grid"></div>
     </div>
 
@@ -340,7 +343,7 @@ const $=id=>document.getElementById(id);
    duração nos metadados do arquivo. Assim a pessoa descobre na hora, em vez de
    esperar o upload inteiro para receber um erro (foi o que travou um testador).
    Os valores vêm do servidor via /auth-config.json.                            */
-let LIM = {maxVideoSeconds:90, maxFileMB:100, maxUploadMB:200};
+let LIM = {maxVideoSeconds:90, maxFileMB:100, maxUploadMB:200, retentionHours:48};
 
 function fmtDur(s){
   s=Math.round(s);
@@ -387,6 +390,11 @@ function toast(t,err,ms){
 async function boot(){
   try{ cfg = await (await fetch('/auth-config.json')).json(); }catch(e){ cfg={authEnabled:false}; }
   if(cfg && cfg.limits) LIM = Object.assign(LIM, cfg.limits);
+  // O prazo vem do servidor: mudou a regra do bucket, muda a variável e o texto
+  // acompanha — em vez de a tela prometer 48h quando já não é mais verdade.
+  const aviso=$('results-warn');
+  if(aviso) aviso.innerHTML='Seus vídeos ficam disponíveis por <b>'+LIM.retentionHours
+    +' horas</b>. Depois disso são apagados automaticamente.';
   if(cfg.authEnabled){
     if(typeof supabase==='undefined'){
       $('gate').innerHTML='<div style="text-align:center;color:#aaa;font-size:14px;max-width:340px;line-height:1.6">Não consegui carregar a biblioteca de login.<br>Verifique sua internet e recarregue a página.</div>';
@@ -784,13 +792,30 @@ function renderResults(){
   grid.innerHTML=results.map((f,i)=>`<div class="res"><div class="n">Variação ${String(i+1).padStart(2,'0')}</div><button class="b" onclick="dl('${f}')">⬇</button></div>`).join('');
   saveLastJob();
 }
+/* Dois caminhos de download:
+   · com R2, o servidor devolve um LINK assinado e o navegador baixa direto do
+     bucket — os bytes não passam pelo nosso servidor, e o download aparece no
+     gerenciador do navegador em vez de ficar preso na memória da aba;
+   · sem R2 (rodando local), o arquivo vem no corpo da resposta, como antes.
+   O front detecta pelo tipo da resposta, então os dois modos convivem.        */
 async function dl(f){
   try{
     const r=await api('/download/'+jobId+'/'+f);
     if(!r.ok){ toast(httpMessage(r.status),true); return; }
-    const b=await r.blob(); const u=URL.createObjectURL(b);
-    const a=document.createElement('a'); a.href=u; a.download=f; document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(()=>URL.revokeObjectURL(u),4000);
+    const ct=r.headers.get('content-type')||'';
+    let href, revogar=null;
+    if(ct.includes('json')){
+      const d=await r.json();
+      if(!d.url){ toast('Não consegui gerar o link deste vídeo.',true); return; }
+      href=d.url;                       // link assinado do bucket
+    }else{
+      const b=await r.blob();
+      href=URL.createObjectURL(b); revogar=href;
+    }
+    const a=document.createElement('a');
+    a.href=href; a.download=f; a.rel='noopener';
+    document.body.appendChild(a); a.click(); a.remove();
+    if(revogar) setTimeout(()=>URL.revokeObjectURL(revogar),4000);
   }catch(e){ toast(friendly(e),true); }
 }
 async function downloadAll(){ for(const f of results){ await dl(f); await new Promise(r=>setTimeout(r,400)); } }

@@ -25,6 +25,7 @@ image = (
         "opencv-python-headless>=4.8",
         "mediapipe==0.10.9",
         "numpy<2",
+        "boto3>=1.34",          # grava os vídeos no R2 (API compatível com S3)
     )
     .run_commands(
         "mkdir -p /usr/share/fonts/poppins",
@@ -490,14 +491,56 @@ def process_job_http(job_id, file_urls, output_base_url, count,
         with urllib.request.urlopen(req, timeout=180) as r:
             return r.read()
 
-    def put_file(fname, path):
-        with open(path, "rb") as f:
-            _put(f"{output_base_url}/{urllib.parse.quote(fname)}", f.read(), "video/mp4")
-        print(f"[MODAL] devolvido {fname}")
-
     def put_meta(name, obj):
         _put(f"{output_base_url}/meta/{urllib.parse.quote(name)}",
              json.dumps(obj).encode(), "application/json")
+
+    # ── DESTINO DOS VÍDEOS ────────────────────────────────────────────────────
+    # Com o R2 configurado, o vídeo vai daqui direto pro bucket e nunca passa
+    # pelo servidor web. Sem credenciais, cai no caminho antigo (PUT de volta),
+    # que é o que roda quando alguém testa sem bucket.
+    r2_bucket = os.environ.get("R2_BUCKET", "").strip()
+    r2_endpoint = (os.environ.get("R2_ENDPOINT", "").strip() or
+                   (f"https://{os.environ['R2_ACCOUNT_ID']}.r2.cloudflarestorage.com"
+                    if os.environ.get("R2_ACCOUNT_ID") else ""))
+    usar_r2 = bool(r2_bucket and r2_endpoint and
+                   os.environ.get("R2_ACCESS_KEY_ID") and
+                   os.environ.get("R2_SECRET_ACCESS_KEY"))
+
+    _cli = None
+    def r2_client():
+        nonlocal _cli
+        if _cli is None:
+            import boto3
+            from botocore.config import Config
+            _cli = boto3.client(
+                "s3", endpoint_url=r2_endpoint,
+                aws_access_key_id=os.environ["R2_ACCESS_KEY_ID"],
+                aws_secret_access_key=os.environ["R2_SECRET_ACCESS_KEY"],
+                region_name="auto",
+                config=Config(signature_version="s3v4", retries={"max_attempts": 3}),
+            )
+        return _cli
+
+    prontos = []
+
+    def put_file(fname, path):
+        if usar_r2:
+            r2_client().upload_file(
+                path, r2_bucket, f"{job_id}/{fname}",
+                ExtraArgs={"ContentType": "video/mp4"})
+            print(f"[MODAL] enviado ao R2: {job_id}/{fname}")
+        else:
+            with open(path, "rb") as f:
+                _put(f"{output_base_url}/{urllib.parse.quote(fname)}", f.read(), "video/mp4")
+            print(f"[MODAL] devolvido {fname}")
+        # O servidor web não vê mais os arquivos chegarem — este aviso é a única
+        # forma de a barra de progresso do usuário andar antes do fim do job.
+        prontos.append(fname)
+        try:
+            put_meta("progress.json", {"files": prontos})
+        except Exception as e:
+            print(f"[MODAL] aviso de progresso falhou (segue o render): {e}")
 
     # 1) baixa os takes
     local_files = []
@@ -523,13 +566,19 @@ def process_job_http(job_id, file_urls, output_base_url, count,
                                    headline_text, headline_duration, put_file)
         if takes_map:
             put_meta("takes_map.json", takes_map)
-        put_meta("_done.json", {"status": "done", "takes_map": takes_map})
-        print(f"[MODAL] job {job_id} concluído")
+        # `files` vai junto e é a lista autoritativa: se algum aviso de progresso
+        # se perdeu no caminho, o estado final ainda fica correto.
+        put_meta("_done.json", {"status": "done", "takes_map": takes_map,
+                                "files": sorted(prontos)})
+        print(f"[MODAL] job {job_id} concluído · {len(prontos)} vídeo(s)")
     except Exception as e:
         import traceback
         print("[MODAL] erro:", e, traceback.format_exc())
         try:
-            put_meta("_done.json", {"status": "error", "error": str(e)})
+            # Manda o que chegou a ficar pronto: entregar 3 de 5 é melhor que
+            # marcar erro e sumir com os 3.
+            put_meta("_done.json", {"status": "error", "error": str(e),
+                                    "files": sorted(prontos)})
         except Exception as e2:
             print("[MODAL] falha ao avisar erro:", e2)
     finally:

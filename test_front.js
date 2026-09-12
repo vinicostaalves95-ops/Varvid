@@ -1,7 +1,7 @@
 // Harness mínimo: roda o JS do app.html em Node com um DOM falso, pra exercitar
 // a lógica de duração e a rede de segurança do onFiles.
 const fs=require('fs');
-const html=fs.readFileSync('/home/claude/Varvid/app.html','utf8');
+const html=fs.readFileSync(require('path').join(__dirname,'app.html'),'utf8');
 const appSrc=[...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g)]
   .map(m=>m[1]).join('\n').replace(/\nboot\(\);?\s*$/,'\n');
 

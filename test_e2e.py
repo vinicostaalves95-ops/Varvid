@@ -3,11 +3,13 @@ os.environ['VARVID_DATA']='/tmp/vartest/e2edata'
 os.environ['RENDER_BACKEND']='local'
 os.environ['VARVID_SWEEPER']='off'
 shutil.rmtree('/tmp/vartest/e2edata', ignore_errors=True)
-sys.path.insert(0,'/home/claude/Varvid')
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from test_fixtures import garantir_takes
+garantir_takes()   # cria os vídeos de exemplo se faltarem
 import local_app as A
 A.AUTH_ENABLED=False; A.CREDITS_ENABLED=False; A.STRIPE_ENABLED=False
 c=A.app.test_client()
-D='/tmp/vartest/e2e'
+from test_fixtures import PASTA as D
 ok=fail=0
 def check(n,cond,extra=''):
     global ok,fail

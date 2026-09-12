@@ -55,6 +55,111 @@ MODAL_CALLBACK_SECRET = (os.environ.get('MODAL_CALLBACK_SECRET', '') or '').stri
 # já vem pronta. Localmente pode ficar vazia (só é usada no modo modal).
 PUBLIC_URL = (os.environ.get('PUBLIC_URL') or os.environ.get('RENDER_EXTERNAL_URL') or '').strip().rstrip('/')
 
+# ══════════════════════════════════════════════════════════════════════════════
+#  ARMAZENAMENTO DOS VÍDEOS  —  R2 (Cloudflare)
+#
+#  Antes: o Modal devolvia cada vídeo para cá, gravávamos em disco, e o usuário
+#  baixava daqui. A saída é ~5× a entrada, então era ELA que enchia o disco e
+#  consumia a banda do Render — e as conexões longas de download ocupavam as
+#  poucas vagas de requisição do servidor.
+#
+#  Agora: o Modal grava direto no bucket, e o usuário baixa direto de lá por
+#  link assinado. O vídeo nunca toca este servidor. O Render continua sendo o
+#  cérebro (login, créditos, despacho, estado do job), só deixa de ser o caminhão.
+#
+#  Expiração: regra de ciclo de vida do bucket (48h). Não há código de limpeza
+#  para os vídeos — apagar virou configuração.
+#
+#  Sem credenciais configuradas, tudo continua funcionando pelo disco (é o que
+#  vale rodando local). A troca é por ambiente, não por versão do código.
+# ══════════════════════════════════════════════════════════════════════════════
+
+R2_ACCOUNT_ID        = (os.environ.get('R2_ACCOUNT_ID', '') or '').strip()
+R2_ACCESS_KEY_ID     = (os.environ.get('R2_ACCESS_KEY_ID', '') or '').strip()
+R2_SECRET_ACCESS_KEY = (os.environ.get('R2_SECRET_ACCESS_KEY', '') or '').strip()
+R2_BUCKET            = (os.environ.get('R2_BUCKET', 'varvid') or 'varvid').strip()
+# Endpoint pode vir pronto (útil em teste) ou ser montado a partir do account id.
+R2_ENDPOINT = (os.environ.get('R2_ENDPOINT', '') or '').strip() or (
+    ('https://%s.r2.cloudflarestorage.com' % R2_ACCOUNT_ID) if R2_ACCOUNT_ID else '')
+# Validade do link de download. Curto de propósito: o link é um passe temporário,
+# não um endereço público do arquivo.
+R2_URL_TTL = int(os.environ.get('R2_URL_TTL_SECONDS', '900'))
+# Só informativo — quem apaga é a regra do bucket. Fica aqui para a frase na tela
+# vir do servidor: se você mudar a regra no Cloudflare de 48h para outra coisa,
+# muda esta variável e o texto acompanha, em vez de mentir para o usuário.
+RETENCAO_HORAS = int(os.environ.get('VARVID_RETENCAO_HORAS', '48'))
+
+R2_ENABLED = bool(R2_ENDPOINT and R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY and R2_BUCKET)
+
+_r2_client = None
+
+
+def r2():
+    """Cliente S3 apontado para o R2, criado sob demanda.
+
+    Preguiçoso porque o boto3 só é necessário quando o R2 está ligado — rodando
+    local (sem credenciais) o app não deve nem exigir a biblioteca instalada.
+    """
+    global _r2_client
+    if _r2_client is None:
+        import boto3
+        from botocore.config import Config
+        _r2_client = boto3.client(
+            's3',
+            endpoint_url=R2_ENDPOINT,
+            aws_access_key_id=R2_ACCESS_KEY_ID,
+            aws_secret_access_key=R2_SECRET_ACCESS_KEY,
+            region_name='auto',                       # o R2 não usa regiões
+            config=Config(signature_version='s3v4', retries={'max_attempts': 3}),
+        )
+    return _r2_client
+
+
+def r2_key(job_id, filename):
+    """Chave do objeto. O job_id como prefixo mantém tudo de uma geração junto."""
+    return '%s/%s' % (job_id, os.path.basename(filename))
+
+
+def r2_download_url(job_id, filename, nome_amigavel=None):
+    """Link assinado de download, válido por R2_URL_TTL segundos.
+
+    `nome_amigavel` força o nome do arquivo salvo pelo navegador — sem isso o
+    download sairia com a chave do objeto no lugar de 'variation_01.mp4'.
+    """
+    nome = nome_amigavel or os.path.basename(filename)
+    return r2().generate_presigned_url(
+        'get_object',
+        Params={
+            'Bucket': R2_BUCKET,
+            'Key': r2_key(job_id, filename),
+            'ResponseContentDisposition': 'attachment; filename="%s"' % nome,
+            'ResponseContentType': 'video/mp4',
+        },
+        ExpiresIn=R2_URL_TTL,
+    )
+
+
+def r2_apagar_job(job_id):
+    """Remove os objetos de um job (usado pelo botão Limpar).
+
+    A expiração automática é do bucket; isto aqui é só o pedido explícito do
+    usuário, que não deve esperar 48h para valer.
+    """
+    if not R2_ENABLED:
+        return 0
+    try:
+        cli = r2()
+        objs = cli.list_objects_v2(Bucket=R2_BUCKET, Prefix='%s/' % job_id).get('Contents', [])
+        if not objs:
+            return 0
+        cli.delete_objects(Bucket=R2_BUCKET,
+                           Delete={'Objects': [{'Key': o['Key']} for o in objs]})
+        return len(objs)
+    except Exception as e:
+        print('[R2] falha ao apagar job %s: %s' % (job_id, e))
+        return 0
+
+
 TARGET_W = 1080
 TARGET_H = 1920
 TEXT_Y_TOP = 260
@@ -1059,12 +1164,19 @@ def load_job(job_id):
 
 
 def _purge_job(jid):
-    """Apaga o JSON e a pasta de um job."""
+    """Apaga o JSON, a pasta local e — se houver — os objetos no R2.
+
+    A expiração de 48h é do bucket. Isto atende o pedido EXPLÍCITO de apagar
+    (botão Limpar, TTL): quem clicou não deve esperar dois dias para os vídeos
+    saírem de lá.
+    """
     try:
         os.remove(os.path.join(DATA_DIR, jid + '.json'))
     except Exception:
         pass
     shutil.rmtree(os.path.join(DATA_DIR, jid), ignore_errors=True)
+    if R2_ENABLED:
+        r2_apagar_job(jid)
 
 
 # ─── ESTADO "EM ANDAMENTO" ────────────────────────────────────────────────────
@@ -1326,7 +1438,11 @@ def ensure_disk_space(variacoes=0):
     é infinitamente melhor que o OSError que derrubou o app em 06/09, mas ainda
     assim significa usuário bloqueado — por isso tentamos liberar antes.
     """
-    preciso = MIN_FREE_MB + variacoes * EST_MB_POR_VARIACAO
+    # Com o R2, as variações não ocupam este disco — só os takes enviados. Então
+    # não há nada a reservar para a saída. É a maior parte da pressão que some:
+    # de ~130 MB por geração para ~30 MB.
+    por_variacao = 0 if R2_ENABLED else EST_MB_POR_VARIACAO
+    preciso = MIN_FREE_MB + variacoes * por_variacao
     free = free_space_mb()
     if free >= preciso:
         return True, free
@@ -1394,6 +1510,7 @@ def auth_config():
             'maxVideoSeconds': MAX_VIDEO_SECONDS,
             'maxFileMB': MAX_FILE_MB,
             'maxUploadMB': MAX_UPLOAD_MB,
+            'retentionHours': RETENCAO_HORAS,
         },
     })
 
@@ -1682,6 +1799,15 @@ def status(job_id):
     job = load_job(job_id)
     if AUTH_ENABLED and (job is None or job.get('user_id') != uid):
         return jsonify({'status': 'not_found'}), 404
+    # Com o R2, os vídeos não estão mais no disco daqui — quem sabe o que ficou
+    # pronto é o próprio Modal, que avisa a cada arquivo (meta/progress). Então a
+    # lista vem do JSON do job, não de um listdir. Listar o bucket a cada consulta
+    # do navegador (a cada 1,5s, por usuário) seria desperdício de requisição.
+    if R2_ENABLED:
+        if not job:
+            return jsonify({'status': 'not_found'})
+        return jsonify(job)
+
     out_dir = os.path.join(job_dir(job_id), 'output')
     if os.path.exists(out_dir):
         done = sorted([f for f in os.listdir(out_dir) if f.endswith('.mp4')])
@@ -1706,14 +1832,37 @@ def status(job_id):
 
 @app.route('/download/<job_id>/<filename>')
 def download(job_id, filename):
+    """Com R2: devolve um LINK assinado. Sem R2: serve o arquivo do disco.
+
+    Devolver o link em vez do arquivo é o ponto da migração — assim os bytes vão
+    do bucket direto pro navegador, sem passar por aqui. Uma requisição de
+    download deixa de ocupar uma vaga do servidor por minutos.
+
+    O link vai no corpo da resposta, não na URL: a autenticação continua no
+    cabeçalho e o token do usuário nunca aparece em barra de endereço ou log.
+    """
     uid = current_user_id()
     if AUTH_ENABLED and not uid:
-        return 'unauthorized', 401
-    if AUTH_ENABLED and _owned_job(job_id, uid) is None:
-        return 'not found', 404
-    path = os.path.join(job_dir(job_id), 'output', secure_filename(filename))
+        return jsonify({'error': 'unauthorized'}), 401
+    job = _owned_job(job_id, uid)
+    if AUTH_ENABLED and job is None:
+        return jsonify({'error': 'not_found'}), 404
+
+    nome = secure_filename(filename)
+
+    if R2_ENABLED:
+        arquivos = (job or load_job(job_id) or {}).get('files', [])
+        if nome not in arquivos:
+            return jsonify({'error': 'not_found'}), 404
+        try:
+            return jsonify({'url': r2_download_url(job_id, nome, nome_amigavel=nome)})
+        except Exception as e:
+            print('[R2] falha ao assinar link de %s/%s: %s' % (job_id, nome, e))
+            return jsonify({'error': 'falha_link'}), 502
+
+    path = os.path.join(job_dir(job_id), 'output', nome)
     if not os.path.exists(path):
-        return 'not found', 404
+        return jsonify({'error': 'not_found'}), 404
     return send_file(path, as_attachment=True, download_name=filename, mimetype='video/mp4')
 
 
@@ -1794,7 +1943,19 @@ def modal_output_meta(job_id, filename):
         body = json.loads(request.get_data() or b'{}')
     except Exception:
         body = {}
-    if name.startswith('takes_map'):
+    if name.startswith('progress'):
+        # Com o R2 o vídeo não passa por aqui, então este aviso é a ÚNICA forma
+        # de o Render saber que mais um ficou pronto. Sem ele a barra de
+        # progresso ficaria parada até o _done, e o usuário acharia que travou.
+        arquivos = sorted(set(body.get('files') or []))
+        if arquivos:
+            j['files'] = arquivos
+            j['completed'] = len(arquivos)
+            total = max(int(j.get('count_requested') or len(arquivos)), 1)
+            j['progress'] = max(5, min(95, int(len(arquivos) / total * 95)))
+            if j.get('status') not in ('error', 'done'):
+                j['status'] = 'rendering'
+    elif name.startswith('takes_map'):
         j['takes_map'] = body
     elif name.startswith('_done'):
         # o Modal terminou: fixa o status de forma autoritativa
@@ -1803,6 +1964,9 @@ def modal_output_meta(job_id, filename):
             j['error'] = body['error']
         if body.get('takes_map'):
             j['takes_map'] = body['takes_map']
+        if body.get('files'):                 # lista final, autoritativa
+            j['files'] = sorted(set(body['files']))
+            j['completed'] = len(j['files'])
         j['progress'] = 100 if j['status'] == 'done' else j.get('progress', 0)
     save_job(job_id, j)
     return jsonify({'ok': True})
@@ -1884,6 +2048,9 @@ sweep_old_jobs()
 start_sweeper()
 print('[BOOT] TTL=%sh · varredura a cada %ss · espaço livre: %.0f MB'
       % (JOB_TTL_HOURS, int(SWEEP_EVERY_SECONDS), free_space_mb()))
+print('[BOOT] vídeos em: %s' % (
+    ('R2 · bucket %s · link válido por %ss' % (R2_BUCKET, R2_URL_TTL))
+    if R2_ENABLED else 'disco local (R2 não configurado)'))
 
 
 if __name__ == '__main__':

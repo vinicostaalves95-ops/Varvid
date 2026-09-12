@@ -4,7 +4,7 @@ os.environ['RENDER_BACKEND']='local'
 os.environ['VARVID_SWEEPER']='off'          # controlamos a varredura no teste
 os.environ['VARVID_JOB_TTL_HOURS']='1'
 shutil.rmtree('/tmp/vartest/data', ignore_errors=True)
-sys.path.insert(0,'/home/claude/Varvid')
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import local_app as A
 
 ok=fail=0
