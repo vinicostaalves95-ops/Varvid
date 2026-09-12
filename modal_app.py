@@ -470,7 +470,15 @@ def _run_single(files, out_dir, count, headline_text, headline_duration, put_fil
 
 # ─── FUNÇÃO PRINCIPAL (o app web dá spawn nesta) ──────────────────────────────
 
-@app.function(image=image, timeout=1800, memory=2048, cpu=2.0)
+# O secret entra como variáveis de ambiente dentro do container. O nome precisa
+# bater com o que você criou:  modal secret create varvid-r2 ...
+# Se o secret não existir, o `modal deploy` falha na hora — o que é melhor que
+# subir calado e só descobrir na primeira geração que nada foi pro bucket.
+R2_SECRET_NAME = os.environ.get("VARVID_R2_SECRET", "varvid-r2")
+
+
+@app.function(image=image, timeout=1800, memory=2048, cpu=2.0,
+              secrets=[modal.Secret.from_name(R2_SECRET_NAME)])
 def process_job_http(job_id, file_urls, output_base_url, count,
                      headline_text="", headline_duration=3,
                      mode="remix", callback_secret=""):
