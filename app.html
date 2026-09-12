@@ -301,7 +301,8 @@ body.ready{opacity:1}
     <div class="results" id="results">
       <div class="results-head"><div class="results-count" id="results-count">0 vídeos prontos</div>
         <div class="results-actions">
-          <button class="btn-ghost" onclick="clearAll()">✕ Limpar</button>
+          <!-- O "Limpar" agora vive ao lado do GERAR, sempre visível. Manter uma
+               segunda cópia aqui só duplicaria o mesmo comando na tela. -->
           <button class="btn-all" onclick="downloadAll()">⬇ Baixar todos</button>
         </div>
       </div>
@@ -554,7 +555,28 @@ function wire(){
   $('go').addEventListener('click',generate);
 }
 
+/* Rede de segurança do ponto de entrada.
+
+   onFiles virou async quando passou a ler a duração do vídeo, e é chamada pelos
+   eventos assim: `e => onFiles(e.target.files)`. Numa função async, uma exceção
+   vira uma promessa rejeitada SEM ninguém escutando — a pessoa selecionaria o
+   arquivo e nada aconteceria. Nenhum aviso, nenhuma pista: o app pareceria morto.
+
+   Enquanto era síncrona, um erro pelo menos borbulhava. Este invólucro devolve
+   esse comportamento: seja o que for que quebre aqui dentro, vira mensagem na
+   tela e rastro no console, e a seleção é zerada para a pessoa poder tentar de
+   novo em vez de ficar num estado pela metade.                                */
 async function onFiles(fl){
+  try{
+    await _onFiles(fl);
+  }catch(e){
+    console.error('[onFiles] falha inesperada', e);
+    toast('Não consegui ler seus arquivos. Tente selecionar de novo — se persistir, recarregue a página.',true);
+    try{ clearSelection(); limparDuracao(); }catch(_){}
+  }
+}
+
+async function _onFiles(fl){
   if(gerando){   // trava também o arrastar-e-soltar, que ignora input.disabled
     toast(ERR_MSG.geracao_em_andamento,true);
     return;
