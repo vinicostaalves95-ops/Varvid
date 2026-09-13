@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VarVid — Termos e Privacidade</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--accent:#E8FF47;--bg:#080808;--bg2:#0e0e0e;--border:#1e1e1e;--border2:#2a2a2a;
+  --text:#e9e9e9;--muted:#9a9a9a;--dim:#5a5a5a;--rev:#FB923C}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-size:15px;line-height:1.65}
+.topo{position:sticky;top:0;background:rgba(8,8,8,.92);backdrop-filter:blur(8px);
+  border-bottom:1px solid var(--border);z-index:10}
+.topo-in{max-width:780px;margin:0 auto;padding:14px 22px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.logo{display:flex;align-items:center;gap:9px;text-decoration:none;color:var(--text)}
+.logo .mark{width:26px;height:26px;background:var(--accent);border-radius:7px;display:grid;place-items:center}
+.logo .nm{font-family:'Syne',sans-serif;font-size:17px;font-weight:800;letter-spacing:-.02em}
+.abas{display:flex;gap:4px;margin-left:auto}
+.aba{font-size:13px;font-weight:600;color:var(--muted);text-decoration:none;padding:7px 13px;
+  border-radius:8px;cursor:pointer;border:1px solid transparent}
+.aba.on{color:#000;background:var(--accent)}
+.aba:not(.on):hover{color:var(--text);border-color:var(--border2)}
+.voltar{font-size:13px;color:var(--muted);text-decoration:none}
+.voltar:hover{color:var(--accent)}
+main{max-width:780px;margin:0 auto;padding:34px 22px 80px}
+h1{font-family:'Syne',sans-serif;font-size:30px;font-weight:800;letter-spacing:-.02em;margin-bottom:6px}
+.atualizado{font-size:13px;color:var(--dim);margin-bottom:30px}
+h2{font-family:'Syne',sans-serif;font-size:18px;font-weight:700;margin:34px 0 10px;letter-spacing:-.01em}
+p{margin-bottom:13px;color:#ccc}
+ul{margin:0 0 14px 20px;color:#ccc}
+li{margin-bottom:7px}
+b,strong{color:var(--text);font-weight:600}
+a{color:var(--accent)}
+table{width:100%;border-collapse:collapse;margin:6px 0 18px;font-size:13.5px}
+th,td{text-align:left;padding:9px 11px;border-bottom:1px solid var(--border);vertical-align:top}
+th{color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.06em}
+td{color:#c6c6c6}
+.doc{display:none}
+.doc.on{display:block}
+.aviso{display:none}
+.aviso.show{display:block;background:rgba(251,146,60,.09);border:1px solid rgba(251,146,60,.32);
+  border-radius:11px;padding:13px 15px;font-size:13.5px;color:#f5c88a;margin-bottom:26px;line-height:1.55}
+.aviso b{color:#fdba74}
+.rodape{margin-top:46px;padding-top:20px;border-top:1px solid var(--border);font-size:12.5px;color:var(--dim)}
+@media(max-width:620px){
+  main{padding:26px 18px 60px}
+  h1{font-size:24px}
+  .topo-in{padding:12px 18px;gap:10px}
+  .abas{width:100%;margin-left:0}
+  table{font-size:12.5px}
+  th,td{padding:7px 8px}
+}
+</style></head>
+<body>
+
+<div class="topo"><div class="topo-in">
+  <a class="logo" href="/">
+    <div class="mark"><svg viewBox="0 0 15 15" fill="none" width="15" height="15"><rect x="1" y="1" width="5.5" height="5.5" rx="1.5" fill="#000"/><rect x="8.5" y="1" width="5.5" height="5.5" rx="1.5" fill="#000" opacity=".6"/><rect x="1" y="8.5" width="5.5" height="5.5" rx="1.5" fill="#000" opacity=".6"/><rect x="8.5" y="8.5" width="5.5" height="5.5" rx="1.5" fill="#000" opacity=".25"/></svg></div>
+    <span class="nm">VarVid</span>
+  </a>
+  <div class="abas">
+    <a class="aba" id="aba-termos" onclick="mostrar('termos')">Termos de Uso</a>
+    <a class="aba" id="aba-privacidade" onclick="mostrar('privacidade')">Privacidade</a>
+  </div>
+</div></div>
+
+<main>
+
+  <!-- ══════════════════════════ TERMOS ══════════════════════════ -->
+  <div class="doc" id="doc-termos">
+    <h1>Termos de Uso</h1>
+    <div class="atualizado">Última atualização: 13 de setembro de 2026</div>
+
+    <h2>1. Quem somos</h2>
+    <p>O VarVid é um produto operado no Brasil.</p>
+    <p>Esta é uma <b>versão preliminar</b> destes Termos. A identificação completa do
+      responsável e o canal oficial de contato serão publicados aqui antes do início
+      de qualquer cobrança.</p>
+    <p>Ao criar uma conta ou usar o VarVid, você concorda com estes Termos. Se não
+      concordar, não use o serviço.</p>
+
+    <h2>2. O que o VarVid faz</h2>
+    <p>O VarVid gera variações de vídeo a partir de arquivos que você mesmo envia.
+      Ele recombina os trechos enviados, aplica cortes e ajustes automáticos e
+      devolve vários vídeos diferentes entre si.</p>
+    <p>O VarVid <b>não cria conteúdo do zero</b>, não edita por você e não garante
+      desempenho comercial de nenhum vídeo gerado.</p>
+
+    <h2>3. Conta</h2>
+    <p>Para usar o VarVid é preciso criar uma conta com e-mail e senha. Você é
+      responsável por manter sua senha em segredo e por tudo que acontecer na sua conta.</p>
+    <p>A conta é individual. Compartilhar acesso com terceiros não é permitido e pode
+      levar à suspensão.</p>
+    <p>É preciso ter <b>18 anos ou mais</b> para contratar um plano pago.</p>
+
+    <h2>4. Créditos</h2>
+    <p>O uso do VarVid é medido em <b>créditos</b>. Um crédito equivale a um vídeo gerado.</p>
+    <ul>
+      <li>Os créditos são debitados <b>apenas quando o vídeo fica pronto</b>. Se a
+        geração falhar, nada é cobrado. Se sair parte dos vídeos pedidos, são
+        debitados apenas os que foram entregues.</li>
+      <li>Créditos não utilizados <b>acumulam</b> enquanto a assinatura estiver ativa,
+        sem prazo de validade.</li>
+      <li>Créditos <b>não são conversíveis em dinheiro</b> nem transferíveis entre contas.</li>
+      <li>A conta gratuita recebe uma quantidade inicial de créditos, concedida
+        <b>uma única vez</b>, sem renovação.</li>
+    </ul>
+
+    <h2>5. Planos e cobrança</h2>
+    <p>Os planos pagos e seus valores estão descritos na página de planos, dentro do
+      aplicativo. O pagamento é processado pela <b>Stripe</b>; o VarVid não recebe,
+      não processa e não armazena dados do seu cartão.</p>
+    <ul>
+      <li><b>Plano mensal:</b> cobrado no cartão a cada mês, automaticamente, até que
+        você cancele. Os créditos do plano entram a cada cobrança.</li>
+      <li><b>Plano anual:</b> cobrado de uma só vez, com renovação automática a cada
+        12 meses. Os créditos correspondentes aos 12 meses entram integralmente no
+        início do período.</li>
+    </ul>
+    <p>Se a cobrança não for aprovada, a reposição de créditos não acontece e o acesso
+      pode ser suspenso até a regularização.</p>
+
+    <h2>6. Direito de arrependimento e reembolso</h2>
+    <p>Nos termos do art. 49 do Código de Defesa do Consumidor, você pode desistir da
+      contratação em até <b>7 dias corridos</b> contados da data da compra.</p>
+    <p>Como o VarVid entrega o serviço imediatamente, o reembolso nesse prazo é
+      <b>proporcional aos créditos ainda não utilizados</b>. Exemplo: se você contratou
+      um plano com 150 créditos e já gerou 30 vídeos, o reembolso corresponde a 120
+      créditos.</p>
+    <p>Após os 7 dias não há reembolso do período já pago. O cancelamento interrompe as
+      cobranças seguintes e o acesso permanece até o fim do período contratado.</p>
+
+    <h2>7. Cancelamento</h2>
+    <p>Você pode cancelar sua assinatura a qualquer momento, pelo próprio aplicativo,
+      na área de gerenciamento de assinatura. O cancelamento é imediato e não exige
+      contato com o suporte.</p>
+    <p>Ao cancelar:</p>
+    <ul>
+      <li>As cobranças futuras são interrompidas</li>
+      <li>Sua conta volta ao plano gratuito</li>
+      <li><b>Os créditos já acumulados permanecem na conta</b> e podem ser usados</li>
+      <li>Não há novas reposições de crédito</li>
+    </ul>
+    <p>Podemos encerrar ou suspender sua conta em caso de violação destes Termos,
+      mediante aviso, salvo em situações que exijam ação imediata.</p>
+
+    <h2>8. Seus vídeos</h2>
+    <p><b>Os vídeos que você envia continuam seus.</b> O VarVid não adquire propriedade
+      sobre eles.</p>
+    <p>Você nos concede apenas a licença técnica necessária para operar o serviço:
+      armazenar temporariamente, processar e devolver os vídeos gerados. Essa licença
+      termina quando os arquivos são excluídos.</p>
+    <p><b>Você declara que tem direito sobre tudo que envia</b> — imagem das pessoas
+      gravadas, músicas, marcas e qualquer material de terceiros. A responsabilidade
+      por esse conteúdo é sua.</p>
+    <p><b>Os vídeos gerados ficam disponíveis por 48 horas</b> e depois são
+      excluídos automaticamente dos nossos servidores. Baixe o que quiser guardar
+      dentro desse prazo. O VarVid não mantém cópia nem oferece recuperação após a
+      exclusão.</p>
+
+    <h2>9. Uso proibido</h2>
+    <p>Não use o VarVid para:</p>
+    <ul>
+      <li>Conteúdo que você não tem direito de usar</li>
+      <li>Conteúdo sexual envolvendo menores, violência real, discurso de ódio ou
+        qualquer material ilegal</li>
+      <li>Enganar pessoas sobre a identidade de quem aparece no vídeo</li>
+      <li>Tentar burlar limites de uso, automatizar acesso sem autorização, ou
+        sobrecarregar o serviço</li>
+      <li>Revender ou redistribuir o acesso ao VarVid</li>
+    </ul>
+
+    <h2>10. Disponibilidade</h2>
+    <p>O VarVid é oferecido "como está". Trabalhamos para mantê-lo disponível, mas não
+      garantimos funcionamento ininterrupto: pode haver manutenção, instabilidade de
+      fornecedores ou interrupções fora do nosso controle.</p>
+    <p>Podemos alterar, suspender ou descontinuar funcionalidades. Mudanças relevantes
+      serão comunicadas por e-mail com antecedência razoável.</p>
+
+    <h2>11. Limitação de responsabilidade</h2>
+    <p>Na máxima extensão permitida pela lei brasileira, a responsabilidade do VarVid
+      por qualquer reclamação relacionada ao serviço fica limitada ao valor pago por
+      você nos <b>12 meses anteriores</b> ao evento.</p>
+    <p>Não respondemos por lucros cessantes, perda de oportunidade, desempenho de
+      campanhas publicitárias ou resultados comerciais obtidos (ou não) com os vídeos
+      gerados.</p>
+    <p>Nada nesta cláusula afasta direitos que o Código de Defesa do Consumidor garanta
+      de forma inafastável.</p>
+
+    <h2>12. Propriedade intelectual do VarVid</h2>
+    <p>O nome VarVid, o software, a interface e a marca pertencem a VarVid.
+      Estes Termos não transferem nenhum direito sobre eles.</p>
+
+    <h2>13. Mudanças nestes Termos e nos preços</h2>
+    <p>Podemos atualizar estes Termos. Mudanças relevantes serão avisadas por e-mail
+      com pelo menos <b>30 dias</b> de antecedência.</p>
+    <p>Alterações de preço <b>não afetam períodos já pagos</b>. Para assinaturas em
+      vigor, o novo valor só passa a valer na renovação seguinte, com aviso prévio de
+      30 dias — e você pode cancelar antes disso.</p>
+
+    <h2>14. Lei aplicável e foro</h2>
+    <p>Estes Termos são regidos pela lei brasileira. Eventuais controvérsias serão
+      resolvidas no foro do domicílio do consumidor, conforme o Código de Defesa do
+      Consumidor.</p>
+  </div>
+
+  <!-- ══════════════════════ PRIVACIDADE ══════════════════════ -->
+  <div class="doc" id="doc-privacidade">
+    <h1>Política de Privacidade</h1>
+    <div class="atualizado">Última atualização: 13 de setembro de 2026</div>
+
+    <p>Esta Política explica quais dados o VarVid coleta, por que coleta, com quem
+      compartilha e quais são os seus direitos, conforme a Lei Geral de Proteção de
+      Dados (Lei nº 13.709/2018).</p>
+
+    <h2>1. Quem controla seus dados</h2>
+    <p>O VarVid é o controlador dos dados tratados no aplicativo.</p>
+    <p>Esta é uma <b>versão preliminar</b> desta Política. A identificação completa do
+      controlador e o canal para exercer os direitos previstos na LGPD serão publicados
+      aqui antes do início de qualquer cobrança.</p>
+
+    <h2>2. Que dados coletamos</h2>
+    <p>Você nos fornece:</p>
+    <table>
+      <tr><th>Dado</th><th>Quando</th></tr>
+      <tr><td>E-mail</td><td>No cadastro</td></tr>
+      <tr><td>Senha</td><td>No cadastro — armazenada de forma criptografada; não temos acesso a ela</td></tr>
+      <tr><td>Vídeos enviados</td><td>Quando você usa a ferramenta</td></tr>
+    </table>
+    <p>Coletados automaticamente:</p>
+    <table>
+      <tr><th>Dado</th><th>Para quê</th></tr>
+      <tr><td>Endereço IP e dados do navegador</td><td>Segurança e prevenção de abuso</td></tr>
+      <tr><td>Registros de uso (quando gerou, quantos vídeos)</td><td>Controle de créditos e suporte</td></tr>
+    </table>
+    <p><b>O que não coletamos:</b> dados do seu cartão. O pagamento acontece
+      inteiramente dentro da Stripe. O VarVid recebe apenas a confirmação de que a
+      cobrança ocorreu e um identificador do cliente.</p>
+
+    <h2>3. Por que tratamos esses dados</h2>
+    <table>
+      <tr><th>Finalidade</th><th>Base legal (LGPD, art. 7º)</th></tr>
+      <tr><td>Criar e manter sua conta</td><td>Execução de contrato (inciso V)</td></tr>
+      <tr><td>Processar vídeos e entregar o resultado</td><td>Execução de contrato (inciso V)</td></tr>
+      <tr><td>Cobrar e controlar créditos</td><td>Execução de contrato (inciso V)</td></tr>
+      <tr><td>Enviar e-mails operacionais</td><td>Execução de contrato (inciso V)</td></tr>
+      <tr><td>Segurança e prevenção a fraude</td><td>Legítimo interesse (inciso IX)</td></tr>
+      <tr><td>Cumprir obrigações fiscais</td><td>Obrigação legal (inciso II)</td></tr>
+    </table>
+    <p>Não vendemos seus dados. <b>Não usamos seus vídeos para treinar modelos de
+      inteligência artificial.</b> Não enviamos e-mail de marketing sem seu
+      consentimento.</p>
+
+    <h2>4. Com quem compartilhamos</h2>
+    <p>Usamos fornecedores de infraestrutura que tratam dados em nosso nome:</p>
+    <table>
+      <tr><th>Fornecedor</th><th>Para quê</th><th>Onde</th></tr>
+      <tr><td>Supabase</td><td>Contas, login e dados de assinatura</td><td>Estados Unidos</td></tr>
+      <tr><td>Stripe</td><td>Processamento de pagamento</td><td>Estados Unidos</td></tr>
+      <tr><td>Cloudflare R2</td><td>Armazenamento temporário dos vídeos</td><td>Estados Unidos</td></tr>
+      <tr><td>Modal</td><td>Processamento dos vídeos</td><td>Estados Unidos</td></tr>
+      <tr><td>Render</td><td>Hospedagem do aplicativo</td><td>Estados Unidos</td></tr>
+    </table>
+    <p>Além disso, podemos compartilhar dados quando exigido por lei ou ordem judicial.</p>
+
+    <h2>5. Transferência internacional</h2>
+    <p>Os fornecedores acima operam fora do Brasil. Ao usar o VarVid, seus dados são
+      transferidos para os Estados Unidos, sob as salvaguardas contratuais oferecidas
+      por cada fornecedor, conforme o art. 33 da LGPD.</p>
+
+    <h2>6. Por quanto tempo guardamos</h2>
+    <table>
+      <tr><th>Dado</th><th>Prazo</th></tr>
+      <tr><td><b>Vídeos enviados e gerados</b></td><td><b>48 horas</b>, depois excluídos automaticamente</td></tr>
+      <tr><td>Conta (e-mail, plano, créditos)</td><td>Enquanto a conta existir</td></tr>
+      <tr><td>Registros de acesso</td><td>6 meses (art. 15 do Marco Civil da Internet)</td></tr>
+      <tr><td>Registros fiscais de pagamento</td><td>Pelo prazo exigido pela legislação tributária</td></tr>
+    </table>
+    <p>Ao excluir sua conta, apagamos seus dados pessoais, salvo o que a lei exigir que
+      seja mantido.</p>
+
+    <h2>7. Seus direitos</h2>
+    <p>A LGPD (art. 18) garante a você o direito de:</p>
+    <ul>
+      <li>Confirmar que tratamos seus dados e acessá-los</li>
+      <li>Corrigir dados incompletos ou desatualizados</li>
+      <li>Solicitar anonimização, bloqueio ou exclusão de dados desnecessários</li>
+      <li>Pedir a portabilidade dos seus dados</li>
+      <li>Revogar consentimento</li>
+      <li>Saber com quem compartilhamos seus dados</li>
+      <li>Se opor a um tratamento feito com base em legítimo interesse</li>
+    </ul>
+    <p>O canal para exercer esses direitos será publicado aqui junto com a
+      identificação do controlador. O prazo de resposta é de <b>15 dias</b>.</p>
+
+    <h2>8. Segurança</h2>
+    <p>Adotamos medidas técnicas para proteger seus dados, incluindo conexão
+      criptografada, senhas armazenadas de forma irreversível, acesso restrito aos
+      dados e exclusão automática dos vídeos em 48 horas.</p>
+    <p>Nenhum sistema é totalmente imune. Em caso de incidente de segurança relevante,
+      comunicaremos você e a ANPD conforme a lei.</p>
+
+    <h2>9. Cookies</h2>
+    <p>Usamos apenas o armazenamento necessário para manter você conectado e lembrar
+      preferências da interface. <b>Não usamos cookies de publicidade nem rastreamento
+      de terceiros.</b></p>
+
+    <h2>10. Menores de idade</h2>
+    <p>O VarVid não é destinado a menores de 18 anos e não coletamos intencionalmente
+      dados dessa faixa etária. Se identificarmos um cadastro nessa condição, a conta
+      será encerrada.</p>
+
+    <h2>11. Mudanças nesta Política</h2>
+    <p>Se alterarmos esta Política de forma relevante, avisaremos por e-mail com
+      antecedência razoável. A data da última atualização está no topo.</p>
+  </div>
+
+  <div class="rodape">
+    VarVid · <a href="/">voltar ao aplicativo</a>
+  </div>
+</main>
+
+<script>
+function mostrar(qual){
+  ['termos','privacidade'].forEach(function(d){
+    document.getElementById('doc-'+d).className = 'doc' + (d===qual?' on':'');
+    document.getElementById('aba-'+d).className = 'aba' + (d===qual?' on':'');
+  });
+  // Troca o endereço sem recarregar, pra o link ser compartilhável e o botão
+  // voltar do navegador funcionar como a pessoa espera.
+  try{ history.replaceState(null,'','/'+qual); }catch(e){}
+  document.title = 'VarVid — ' + (qual==='termos'?'Termos de Uso':'Política de Privacidade');
+  window.scrollTo(0,0);
+}
+// Qual abrir: o próprio endereço decide.
+mostrar(location.pathname.indexOf('privacidade') !== -1 ? 'privacidade' : 'termos');
+</script>
+</body></html>

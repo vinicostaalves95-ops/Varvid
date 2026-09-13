@@ -138,6 +138,18 @@ else
     exit 1
   fi
   git commit -m "$MSG"
+fi
+
+# O push vive FORA do if de propósito. Antes ele morava dentro, e por isso um
+# commit já feito mas ainda não enviado nunca subia: sem arquivo modificado, o
+# script dizia "nada novo para commitar" e pulava o push junto. A tela então
+# mandava fazer o Deploy no Render — que republicava a MESMA versão, e tudo
+# parecia ter funcionado.
+PENDENTES=$(git rev-list --count @{u}..HEAD 2>/dev/null || echo "0")
+if [ "$PENDENTES" = "0" ]; then
+  echo "  nada a enviar — o GitHub já está em dia"
+else
+  echo "  enviando $PENDENTES commit(s) ao GitHub"
   git push
   echo "✓ enviado ao GitHub"
 fi

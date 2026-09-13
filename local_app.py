@@ -1809,6 +1809,21 @@ def login_page():
     return _read_html('login.html', LOGIN_HTML)
 
 
+@app.route('/termos')
+@app.route('/privacidade')
+def pagina_legal():
+    """Termos de Uso e Política de Privacidade.
+
+    Os dois moram no mesmo arquivo e a própria página escolhe qual mostrar pelo
+    endereço — assim o estilo e o cabeçalho existem uma vez só, em vez de duas
+    páginas quase idênticas se desencontrando com o tempo.
+
+    Versão preliminar: sem identificação do responsável e sem canal de contato,
+    por opção. Isso precisa entrar antes da primeira cobrança.
+    """
+    return _read_html('legal.html', '<h1>legal.html não encontrado</h1>')
+
+
 @app.route('/auth-config.json')
 def auth_config():
     return jsonify({
