@@ -202,6 +202,20 @@ AUTH_ENABLED = bool(SUPABASE_URL and SUPABASE_ANON_KEY)
 # Créditos ligam quando existir a service_key (secreta) além do login.
 CREDITS_ENABLED = bool(AUTH_ENABLED and SUPABASE_SERVICE_KEY)
 
+# Login com Google: DESLIGADO por padrão.
+# O provider precisa ser configurado no Google Cloud Console e no painel do
+# Supabase — nada disso mora aqui. Enquanto não estiver, o botão na tela só
+# leva o usuário a um erro do Google, que é o pior tipo de defeito: parece
+# culpa dele. Então o botão nem aparece.
+# Pra ligar: VARVID_GOOGLE_LOGIN=1 no Render. Sem novo deploy do front, sem
+# mexer em código — é uma variável de ambiente justamente porque o dia em que
+# o provider funcionar não pode depender de mim.
+def _flag(nome, padrao='0'):
+    return os.environ.get(nome, padrao).strip().lower() in ('1', 'true', 'sim', 'on', 'yes')
+
+
+GOOGLE_LOGIN_ENABLED = bool(AUTH_ENABLED and _flag('VARVID_GOOGLE_LOGIN'))
+
 # Planos: 1 crédito = 1 vídeo gerado. Ajuste os números como quiser.
 PLANS = {'free': 10, 'starter': 100, 'pro': 500}
 DEFAULT_PLAN = 'free'
@@ -1504,6 +1518,7 @@ def auth_config():
         'authEnabled': AUTH_ENABLED,
         'url': SUPABASE_URL if AUTH_ENABLED else '',
         'anonKey': SUPABASE_ANON_KEY if AUTH_ENABLED else '',
+        'googleEnabled': GOOGLE_LOGIN_ENABLED,
         # Limites vêm do servidor pra não ficarem duplicados no HTML: mudar a
         # env var no Render passa a valer na tela sem novo deploy do front.
         'limits': {
@@ -2051,6 +2066,9 @@ print('[BOOT] TTL=%sh · varredura a cada %ss · espaço livre: %.0f MB'
 print('[BOOT] vídeos em: %s' % (
     ('R2 · bucket %s · link válido por %ss' % (R2_BUCKET, R2_URL_TTL))
     if R2_ENABLED else 'disco local (R2 não configurado)'))
+print('[BOOT] login: %s · Google: %s' % (
+    'Supabase' if AUTH_ENABLED else 'desligado (modo local)',
+    'ligado' if GOOGLE_LOGIN_ENABLED else 'escondido (VARVID_GOOGLE_LOGIN=0)'))
 
 
 if __name__ == '__main__':

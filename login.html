@@ -47,6 +47,9 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-
 .submit:disabled{opacity:.5;cursor:not-allowed}
 .swap{text-align:center;margin-top:22px;font-size:13px;color:var(--muted)}
 .swap a{color:var(--accent);text-decoration:none;font-weight:500;cursor:pointer}
+.forgot{text-align:right;margin:-6px 0 2px}
+.forgot a{color:var(--muted);text-decoration:none;font-size:12px;cursor:pointer}
+.forgot a:hover{color:var(--accent)}
 .msg{font-size:12.5px;border-radius:9px;padding:10px 12px;margin-bottom:16px;line-height:1.45;display:none}
 .msg.show{display:block}
 .msg.err{background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.35);color:#fca5a5}
@@ -85,15 +88,20 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-
       <div class="msg" id="msg"></div>
 
       <div id="authForm">
-        <button class="gbtn" id="googleBtn">
+        <!-- Começa escondido de propósito: quem decide se aparece é o servidor
+             (googleEnabled). Se o JS falhar, ele fica escondido — o lado certo
+             de falhar, já que um botão que leva a erro é pior que botão nenhum. -->
+        <button class="gbtn" id="googleBtn" style="display:none">
           <svg viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.6l6.7-6.7C35.6 2.4 30.1 0 24 0 14.6 0 6.4 5.4 2.5 13.3l7.8 6.1C12.2 13.7 17.6 9.5 24 9.5z"/><path fill="#4285F4" d="M46.1 24.6c0-1.6-.1-3.1-.4-4.6H24v9.1h12.4c-.5 2.9-2.1 5.3-4.6 7l7.1 5.5c4.2-3.9 6.6-9.6 6.6-16.4z"/><path fill="#FBBC05" d="M10.3 28.6c-.5-1.4-.8-3-.8-4.6s.3-3.2.8-4.6l-7.8-6.1C.9 16.3 0 20 0 24s.9 7.7 2.5 10.7l7.8-6.1z"/><path fill="#34A853" d="M24 48c6.1 0 11.3-2 15-5.5l-7.1-5.5c-2 1.3-4.5 2.1-7.9 2.1-6.4 0-11.8-4.2-13.7-9.9l-7.8 6.1C6.4 42.6 14.6 48 24 48z"/></svg>
           Continuar com Google
         </button>
-        <div class="divider">ou com e-mail</div>
-        <div class="field"><label>E-mail</label><input type="email" id="email" placeholder="voce@email.com" autocomplete="email"></div>
-        <div class="field"><label>Senha</label><input type="password" id="password" placeholder="••••••••" autocomplete="current-password"></div>
+        <div class="divider" id="orDivider" style="display:none">ou com e-mail</div>
+        <div class="field" id="fieldEmail"><label>E-mail</label><input type="email" id="email" placeholder="voce@email.com" autocomplete="email"></div>
+        <div class="field" id="fieldPassword"><label id="passwordLabel">Senha</label><input type="password" id="password" placeholder="••••••••" autocomplete="current-password"></div>
+        <div class="forgot" id="forgotRow"><a id="forgotLink">Esqueci minha senha</a></div>
         <button class="submit" id="submitBtn">ENTRAR →</button>
         <div class="swap" id="swap">Não tem conta? <a id="swapLink">Criar conta grátis</a></div>
+        <div class="swap" id="backRow" style="display:none"><a id="backLink">← Voltar para o login</a></div>
       </div>
 
       <div class="terms">Ao continuar, você concorda com os Termos e a Privacidade.</div>
@@ -103,10 +111,61 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-let sb=null, isSignup=false, cfg=null;
+let sb=null, cfg=null, modo='login';   // login · signup · reset · novaSenha
 const $=id=>document.getElementById(id);
 function showMsg(t,kind){const m=$('msg');m.className='msg show '+kind;m.textContent=t;}
 function hideMsg(){$('msg').className='msg';}
+function ver(id,v){const e=$(id); if(e) e.style.display = v?'':'none';}
+
+/* ── O QUE VEIO NA URL ────────────────────────────────────────────────────────
+   Precisa ser lido AGORA, antes de criar o client do Supabase: ao detectar a
+   sessão, a biblioteca consome o hash e limpa a barra de endereço. Se a gente
+   olhasse depois, não saberia mais que a pessoa chegou por um link de
+   recuperação — e ela cairia direto no app sem nunca trocar a senha.          */
+const URL_HASH  = location.hash || '';
+const URL_QUERY = location.search || '';
+
+function veioDeLinkDeRecuperacao(){
+  // Três sinais, de propósito. O "type=recovery" é o que o Supabase manda hoje
+  // no fluxo implícito; o "?recuperar=1" é nosso, colado no redirectTo, e vale
+  // em qualquer fluxo. Se um dia a biblioteca mudar o formato do link, o nosso
+  // sinal continua de pé — e essa é a diferença entre a recuperação quebrar
+  // silenciosamente e continuar funcionando.
+  return /type=recovery/.test(URL_HASH)
+      || /[?&]type=recovery/.test(URL_QUERY)
+      || /[?&]recuperar=1/.test(URL_QUERY);
+}
+function erroNoLink(){
+  const m = /error_description=([^&]+)/.exec(URL_HASH + URL_QUERY);
+  if(!m) return null;
+  try{ return decodeURIComponent(m[1].replace(/\+/g,' ')); }catch(_){ return m[1]; }
+}
+
+/* ── ERRO TÉCNICO → FRASE EM PORTUGUÊS ────────────────────────────────────────
+   O Supabase responde em inglês e com jargão. Mostrar isso na tela faz a pessoa
+   achar que quebrou alguma coisa. O texto original vai pro console, pra gente
+   conseguir depurar; a pessoa lê o que fazer a seguir.                        */
+const ERROS = {
+  'invalid login credentials'      : 'E-mail ou senha incorretos.',
+  'email not confirmed'            : 'Sua conta ainda não foi confirmada. Procure o e-mail de confirmação que enviamos.',
+  'user already registered'        : 'Já existe uma conta com esse e-mail. Tente entrar.',
+  'password should be at least'    : 'A senha precisa ter pelo menos 6 caracteres.',
+  'new password should be different': 'A nova senha precisa ser diferente da anterior.',
+  'email link is invalid or has expired': 'Esse link expirou. Peça um novo abaixo.',
+  'token has expired or is invalid': 'Esse link expirou. Peça um novo abaixo.',
+  'invalid or expired'             : 'Esse link expirou. Peça um novo abaixo.',
+  'for security purposes'          : 'Muitas tentativas seguidas. Espere um minuto e tente de novo.',
+  'email rate limit exceeded'      : 'Muitos e-mails enviados agora há pouco. Espere alguns minutos e tente de novo.',
+  'over_email_send_rate_limit'     : 'Muitos e-mails enviados agora há pouco. Espere alguns minutos e tente de novo.',
+  'unable to validate email'       : 'Esse e-mail não parece válido. Confira se está escrito certo.',
+  'failed to fetch'                : 'Não consegui falar com o servidor. Verifique sua conexão e tente de novo.',
+};
+function traduzir(msg){
+  const t = String(msg||'').toLowerCase();
+  for(const k in ERROS){ if(t.indexOf(k) !== -1) return ERROS[k]; }
+  console.error('[auth]', msg);
+  return 'Não consegui completar essa ação agora. Tente de novo em instantes.';
+}
 
 async function boot(){
   cfg = await (await fetch('/auth-config.json')).json();
@@ -124,44 +183,126 @@ async function boot(){
     return;
   }
   sb = supabase.createClient(cfg.url, cfg.anonKey);
-  const {data:{session}} = await sb.auth.getSession();
-  if(session){ location.href='/'; return; }   // já logado
 
+  // Alguns fluxos do Supabase só se anunciam por este evento. Registrar antes
+  // de qualquer coisa garante que não vamos perdê-lo.
+  sb.auth.onAuthStateChange(function(ev){ if(ev==='PASSWORD_RECOVERY') irPara('novaSenha'); });
+
+  ligarEventos();
+
+  // getSession() é o que faz a biblioteca processar o que veio na URL.
+  const {data:{session}} = await sb.auth.getSession();
+
+  // A ORDEM DAQUI PRA BAIXO É O CORAÇÃO DA RECUPERAÇÃO DE SENHA.
+  // Quem volta do link de recuperação chega COM sessão válida. Se a checagem
+  // "tem sessão? vai pro app" viesse primeiro, essa pessoa seria jogada direto
+  // lá dentro e nunca veria a tela de definir a nova senha — o link viraria um
+  // "entrar sem senha", e quem esqueceu continuaria sem conseguir trocar.
+  const problema = erroNoLink();
+  if(problema){ irPara('reset'); showMsg(traduzir(problema),'err'); return; }
+  if(veioDeLinkDeRecuperacao()){ irPara('novaSenha'); return; }
+  if(session){ location.href='/'; return; }   // já logado, uso normal
+  irPara('login');
+}
+
+function ligarEventos(){
   $('googleBtn').onclick = async ()=>{
     hideMsg();
     const {error} = await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:location.origin}});
-    if(error) showMsg(error.message,'err');
+    if(error) showMsg(traduzir(error.message),'err');
   };
   $('submitBtn').onclick = doSubmit;
-  $('swapLink').onclick = toggleMode;
+  $('swapLink').onclick  = ()=>irPara(modo==='signup'?'login':'signup');
+  $('forgotLink').onclick= ()=>irPara('reset');
+  $('backLink').onclick  = ()=>irPara('login');
   [$('email'),$('password')].forEach(el=>el.addEventListener('keydown',e=>{if(e.key==='Enter')doSubmit();}));
 }
 
-function toggleMode(){
-  isSignup=!isSignup; hideMsg();
-  $('title').textContent = isSignup?'Criar sua conta':'Entrar na sua conta';
-  $('subtitle').textContent = isSignup?'Comece a gerar variações agora.':'Bem-vindo de volta — vamos criar.';
-  $('submitBtn').textContent = isSignup?'CRIAR CONTA →':'ENTRAR →';
-  $('swap').innerHTML = isSignup?'Já tem conta? <a id="swapLink">Entrar</a>':'Não tem conta? <a id="swapLink">Criar conta grátis</a>';
-  $('swapLink').onclick = toggleMode;
+/* ── UMA TELA, QUATRO ESTADOS ─────────────────────────────────────────────────
+   Em vez de quatro páginas (quatro lugares pra esquecer de corrigir um texto),
+   a mesma tela mostra só o que faz sentido em cada momento.                   */
+const TELAS = {
+  login:     {titulo:'Entrar na sua conta',   sub:'Bem-vindo de volta — vamos criar.',
+              botao:'ENTRAR →',           email:true,  senha:true,  esqueci:true,  trocar:true,  voltar:false},
+  signup:    {titulo:'Criar sua conta',       sub:'Comece a gerar variações agora.',
+              botao:'CRIAR CONTA →',      email:true,  senha:true,  esqueci:false, trocar:true,  voltar:false},
+  reset:     {titulo:'Recuperar senha',       sub:'Diga seu e-mail que eu mando um link pra você criar uma senha nova.',
+              botao:'ENVIAR LINK →',      email:true,  senha:false, esqueci:false, trocar:false, voltar:true},
+  novaSenha: {titulo:'Criar uma senha nova',  sub:'Link confirmado. Escolha a senha que você vai usar de agora em diante.',
+              botao:'SALVAR SENHA →',     email:false, senha:true,  esqueci:false, trocar:false, voltar:false},
+};
+
+function irPara(novo){
+  modo = novo; hideMsg();
+  const t = TELAS[modo];
+  $('title').textContent    = t.titulo;
+  $('subtitle').textContent = t.sub;
+  $('submitBtn').textContent= t.botao;
+  ver('fieldEmail',    t.email);
+  ver('fieldPassword', t.senha);
+  ver('forgotRow',     t.esqueci);
+  ver('swap',          t.trocar);
+  ver('backRow',       t.voltar);
+  // O botão do Google só existe onde faz sentido — e só se o provider estiver
+  // realmente ligado no servidor. Enquanto não estiver, ele levaria a pessoa a
+  // um erro do Google, que parece culpa dela. Melhor nem aparecer.
+  const mostrarGoogle = !!(cfg && cfg.googleEnabled) && (modo==='login' || modo==='signup');
+  ver('googleBtn', mostrarGoogle);
+  ver('orDivider', mostrarGoogle);
+  $('passwordLabel').textContent = (modo==='novaSenha') ? 'Nova senha' : 'Senha';
+  $('password').setAttribute('autocomplete', modo==='login' ? 'current-password' : 'new-password');
+  if(modo==='signup') $('swap').innerHTML = 'Já tem conta? <a id="swapLink">Entrar</a>';
+  if(modo==='login')  $('swap').innerHTML = 'Não tem conta? <a id="swapLink">Criar conta grátis</a>';
+  const sl=$('swapLink'); if(sl) sl.onclick = ()=>irPara(modo==='signup'?'login':'signup');
 }
 
 async function doSubmit(){
   hideMsg();
   const email=$('email').value.trim(), password=$('password').value;
-  if(!email||!password){showMsg('Preencha e-mail e senha.','err');return;}
+
+  if(modo!=='novaSenha' && !email){ showMsg('Preencha seu e-mail.','err'); return; }
+  if(modo!=='reset' && !password){ showMsg('Preencha a senha.','err'); return; }
+  if((modo==='signup'||modo==='novaSenha') && password.length<6){
+    showMsg('A senha precisa ter pelo menos 6 caracteres.','err'); return;
+  }
+
   $('submitBtn').disabled=true;
   try{
-    if(isSignup){
+    if(modo==='signup'){
       const {data,error}=await sb.auth.signUp({email,password});
-      if(error){showMsg(error.message,'err');return;}
+      if(error){showMsg(traduzir(error.message),'err');return;}
       if(data.session){ location.href='/'; }
-      else showMsg('Conta criada! Confira seu e-mail pra confirmar o cadastro (ou desative a confirmação no Supabase pra entrar direto).','ok');
-    }else{
+      else showMsg('Conta criada! Confira seu e-mail pra confirmar o cadastro.','ok');
+
+    }else if(modo==='login'){
       const {error}=await sb.auth.signInWithPassword({email,password});
-      if(error){showMsg(error.message,'err');return;}
+      if(error){showMsg(traduzir(error.message),'err');return;}
       location.href='/';
+
+    }else if(modo==='reset'){
+      // redirectTo precisa ser ESTA página: é aqui que a tela de nova senha
+      // mora. Se apontasse pra raiz, a pessoa cairia no app com sessão aberta
+      // e sem nunca trocar a senha.
+      const {error}=await sb.auth.resetPasswordForEmail(email,{redirectTo:location.origin+'/login?recuperar=1'});
+      if(error){showMsg(traduzir(error.message),'err');return;}
+      // Resposta igual existindo a conta ou não: dizer "esse e-mail não tem
+      // cadastro" entregaria a estranhos quem é cliente.
+      showMsg('Se existir uma conta com esse e-mail, o link está a caminho. Ele vale por 1 hora — confira também o spam.','ok');
+
+    }else if(modo==='novaSenha'){
+      const {error}=await sb.auth.updateUser({password});
+      if(error){
+        showMsg(traduzir(error.message),'err');
+        // Link já usado ou vencido: não adianta insistir nesta tela.
+        if(String(error.message||'').toLowerCase().indexOf('expired')!==-1) irPara('reset');
+        return;
+      }
+      showMsg('Senha alterada. Entrando…','ok');
+      setTimeout(()=>{ location.href='/'; }, 900);
     }
+  }catch(e){
+    // Sem isto, qualquer falha de rede deixaria a tela muda e o botão travado.
+    showMsg(traduzir(e && e.message), 'err');
   }finally{ $('submitBtn').disabled=false; }
 }
 boot();

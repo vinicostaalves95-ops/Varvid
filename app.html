@@ -216,7 +216,13 @@ body.ready{opacity:1}
     <div class="sec">
       <div class="sec-label-row">
         <div class="sec-label" data-step="2" id="upload-label" style="margin-bottom:0">Seus takes</div>
-        <button class="btn-ghost" id="clearTakesBtn" style="display:none" onclick="clearSelection()">✕ limpar</button>
+        <!-- Este botão chamava-se "limpar", igual ao de baixo, e os dois fazem
+             coisas diferentes: este mexe só na seleção da tela, o de baixo apaga
+             também o que está no servidor. Dois botões com a mesma palavra na
+             mesma tela é só confusão. Aqui o verbo do momento é trocar: ele só
+             aparece quando já existe arquivo escolhido. "Limpar" ficou sendo
+             palavra única no app, com um significado só: recomeçar do zero. -->
+        <button class="btn-ghost" id="clearTakesBtn" style="display:none" onclick="clearSelection()">✕ trocar takes</button>
       </div>
       <div class="drop" id="drop">
         <input type="file" id="file" accept="video/*,.mov,.mp4,.MOV,.MP4" multiple>

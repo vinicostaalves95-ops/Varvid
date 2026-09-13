@@ -28,6 +28,19 @@ echo "════════════════════════�
 echo "  VarVid · publicando"
 echo "═══════════════════════════════════════════════════"
 
+# ── 0. integridade da entrega ───────────────────────────────────────────────
+# Arquivos já rastreados pelo git voltaram sozinhos à versão anterior cinco
+# vezes nesta pasta. Commitar sem perceber publica código velho achando que é o
+# novo — foi o que quase subiu o Modal sem as credenciais do R2. Confere antes.
+if [ -f "conferir.sh" ] && [ -f ".entregue.sha" ]; then
+  echo ""
+  if ! bash conferir.sh; then
+    echo ""
+    echo "❌ Nada foi publicado."
+    exit 1
+  fi
+fi
+
 # ── venv ────────────────────────────────────────────────────────────────────
 if [ -d ".venv" ]; then
   source .venv/bin/activate
@@ -40,7 +53,7 @@ fi
 echo ""
 echo "── testes ─────────────────────────────────────────"
 FALHOU=0
-for t in test_varvid.py test_bloqueio.py test_limites.py test_e2e.py test_r2.py; do
+for t in test_varvid.py test_bloqueio.py test_limites.py test_auth.py test_e2e.py test_r2.py; do
   [ -f "$t" ] || continue
   printf "  %-20s " "$t"
   if SAIDA=$(python3 "$t" 2>&1); then
@@ -55,9 +68,20 @@ for t in test_varvid.py test_bloqueio.py test_limites.py test_e2e.py test_r2.py;
     fi
   fi
 done
-if [ -f "test_front.js" ] && command -v node >/dev/null 2>&1; then
-  printf "  %-20s " "test_front.js"
-  node test_front.js 2>&1 | grep -E "passaram" | tail -1 || echo "❌ FALHOU"
+if command -v node >/dev/null 2>&1; then
+  for t in test_front.js test_login.js; do
+    [ -f "$t" ] || continue
+    printf "  %-20s " "$t"
+    if SAIDA=$(node "$t" 2>&1); then
+      echo "$SAIDA" | grep -E "passaram" | tail -1 | tr -d '\n'; echo ""
+    else
+      echo "❌ FALHOU"
+      echo "$SAIDA" | tail -15
+      FALHOU=1
+    fi
+  done
+else
+  echo "  (node não encontrado — testes de tela pulados)"
 fi
 
 if [ "$FALHOU" = "1" ]; then
@@ -72,17 +96,29 @@ fi
 # sentido repetir quando a mudança foi só no app web.
 echo ""
 echo "── Modal ──────────────────────────────────────────"
-if git diff --quiet HEAD -- modal_app.py 2>/dev/null; then
-  echo "  modal_app.py sem mudanças — nada a republicar"
+# Comparar com o git era errado: depois de commitar, o arquivo "não mudou" e o
+# deploy do Modal era pulado — foi assim que o Modal ficou com código velho
+# enquanto o Render já esperava o formato novo. Agora guardamos a impressão
+# digital do que foi realmente publicado.
+MARCA=".modal-publicado"
+HASH_ATUAL=$(shasum modal_app.py | awk '{print $1}')
+HASH_PUBLICADO=$(cat "$MARCA" 2>/dev/null || echo "")
+
+if [ "$HASH_ATUAL" = "$HASH_PUBLICADO" ]; then
+  echo "  modal_app.py já publicado nesta versão — nada a fazer"
+elif ! command -v modal >/dev/null 2>&1; then
+  echo "🔴 PARE: o modal_app.py mudou mas o comando 'modal' não existe aqui."
+  echo "   Publicar só o app web deixaria os dois lados incompatíveis"
+  echo "   (o Modal mandaria o vídeo pro lugar errado e o usuário veria zero)."
+  echo ""
+  echo "   Ative o ambiente e rode:"
+  echo "     source .venv/bin/activate && modal deploy modal_app.py"
+  exit 1
 else
-  if command -v modal >/dev/null 2>&1; then
-    echo "  modal_app.py mudou — publicando (pode demorar alguns minutos)"
-    modal deploy modal_app.py
-    echo "✓ Modal atualizado"
-  else
-    echo "⚠️  comando 'modal' não encontrado — publique manualmente:"
-    echo "     modal deploy modal_app.py"
-  fi
+  echo "  modal_app.py mudou — publicando (pode demorar alguns minutos)"
+  modal deploy modal_app.py
+  echo "$HASH_ATUAL" > "$MARCA"
+  echo "✓ Modal atualizado"
 fi
 
 # ── 3. GitHub ───────────────────────────────────────────────────────────────
