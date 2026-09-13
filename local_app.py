@@ -20,6 +20,8 @@ import uuid
 import random
 import shutil
 import errno
+import calendar
+import datetime
 import tempfile
 import subprocess
 import threading
@@ -217,7 +219,14 @@ def _flag(nome, padrao='0'):
 GOOGLE_LOGIN_ENABLED = bool(AUTH_ENABLED and _flag('VARVID_GOOGLE_LOGIN'))
 
 # Planos: 1 crédito = 1 vídeo gerado. Ajuste os números como quiser.
-PLANS = {'free': 10, 'starter': 100, 'pro': 500}
+# Quantos vídeos cada plano dá por mês. O free é de uso único: ganha os 10 ao
+# criar a conta e não renova — nada aqui repõe crédito de graça. Dez vídeos
+# bastam pra pessoa ver funcionando numa campanha de verdade e não bastam pra
+# viver deles, que é exatamente o ponto.
+PLANS = {'free': 10, 'starter': 50, 'pro': 150, 'studio': 400}
+PLANS_PAGOS = ('starter', 'pro', 'studio')       # ordem que aparece na tela
+PLAN_LABELS = {'free': 'Free', 'starter': 'Starter', 'pro': 'Pro', 'studio': 'Studio'}
+CICLOS = ('mensal', 'anual')
 DEFAULT_PLAN = 'free'
 DEFAULT_CREDITS = PLANS[DEFAULT_PLAN]
 
@@ -301,18 +310,168 @@ def _sb_rest(method, path, body=None):
     raise last
 
 
+PERFIL_CAMPOS = 'credits,plan,ciclo,renova_em,stripe_subscription_id,stripe_customer_id'
+
+
 def get_or_create_profile(uid, email=None):
-    """Lê o perfil do usuário; se não existir, cria com o plano/créditos padrão."""
+    """Lê o perfil do usuário; se não existir, cria com o plano/créditos padrão.
+
+    Também é aqui que a reposição de créditos acontece: toda leitura de perfil
+    passa por este ponto, então não existe caminho no app em que alguém use a
+    ferramenta com a renovação vencida sem ela ser aplicada.
+    """
     try:
-        rows = _sb_rest('GET', 'profiles?id=eq.%s&select=credits,plan' % uid)
+        rows = _sb_rest('GET', 'profiles?id=eq.%s&select=%s' % (uid, PERFIL_CAMPOS))
         if rows:
-            return rows[0]
+            return repor_creditos_se_vencido(uid, rows[0])
         created = _sb_rest('POST', 'profiles',
                            {'id': uid, 'email': email, 'plan': DEFAULT_PLAN, 'credits': DEFAULT_CREDITS})
         return created[0] if created else {'credits': DEFAULT_CREDITS, 'plan': DEFAULT_PLAN}
     except Exception as e:
         print('[CREDITS] erro ao ler/criar perfil:', e)
         return None
+
+
+# ─── RENOVAÇÃO DE CRÉDITOS ────────────────────────────────────────────────────
+# Antes, repor crédito dependia do Stripe avisar que uma fatura foi paga. Duas
+# coisas quebravam nisso: o aviso só chega se o webhook estiver configurado (não
+# estava), e no plano anual ele chega UMA vez por ano — o assinante anual
+# receberia a cota de um mês e passaria doze sem nada.
+#
+# Agora a regra é por data, guardada no próprio perfil. Não depende de aviso
+# nenhum chegar, e se conserta sozinha: se ninguém entrar no app por três meses,
+# no próximo acesso as três reposições são aplicadas de uma vez.
+#
+# O que a data NÃO faz sozinha é saber se o cliente pagou. Por isso, no momento
+# em que ela vence, perguntamos ao Stripe se a assinatura está ativa — senão
+# cartão recusado viraria crédito de graça todo mês.
+
+def _iso(dt):
+    return dt.strftime('%Y-%m-%dT%H:%M:%SZ')
+
+
+def _do_iso(txt):
+    if not txt:
+        return None
+    t = str(txt).strip().replace('Z', '').replace('T', ' ')
+    t = t.split('.')[0].split('+')[0]
+    for fmt in ('%Y-%m-%d %H:%M:%S', '%Y-%m-%d'):
+        try:
+            return datetime.datetime.strptime(t, fmt)
+        except ValueError:
+            continue
+    return None
+
+
+def _mais_meses(dt, meses):
+    """Soma meses de calendário. 31/01 + 1 mês = 28/02, não 03/03."""
+    ano = dt.year + (dt.month - 1 + meses) // 12
+    mes = (dt.month - 1 + meses) % 12 + 1
+    dia = min(dt.day, calendar.monthrange(ano, mes)[1])
+    return dt.replace(year=ano, month=mes, day=dia)
+
+
+def creditos_do_ciclo(plan, ciclo):
+    """Quanto entra por reposição.
+
+    No anual entra o ano inteiro de uma vez — foi a decisão de produto: quem
+    pagou doze meses pode disparar uma campanha inteira na primeira semana.
+    """
+    base = PLANS.get(plan, PLANS['free'])
+    return base * 12 if ciclo == 'anual' else base
+
+
+def _passo_do_ciclo(ciclo):
+    return 12 if ciclo == 'anual' else 1
+
+
+def saldo_acabando(plan, ciclo, creditos):
+    """Quando vale interromper a pessoa pra avisar do saldo.
+
+    Uma regra só — 20% da cota DO CICLO — e ela já dá os dois comportamentos que
+    a gente queria. No mensal a cota é 150, então avisa em 30: existe uma rede
+    embaixo (vira o mês e repõe), avisar antes seria barulho. No anual a cota é
+    1.800, então avisa em 360: não existe rede nenhuma, a próxima reposição pode
+    estar a dez meses, e descobrir isso com o saldo zerado é tarde demais.
+
+    Duas regras separadas fariam a mesma coisa com o dobro de superfície pra
+    errar.
+    """
+    if not plan or plan == 'free' or plan not in PLANS:
+        return False
+    cota = creditos_do_ciclo(plan, ciclo)
+    return int(creditos or 0) <= max(1, int(cota * 0.2))
+
+
+def assinatura_ativa(prof):
+    """Pergunta ao Stripe se a assinatura está em dia.
+
+    Devolve None quando não foi possível perguntar (Stripe fora do ar, erro de
+    rede). None não é "não": é "não sei" — e quem não sabe não repõe E não
+    empurra a data, pra tentar de novo no próximo acesso. Assim uma instabilidade
+    do Stripe atrasa a reposição por minutos em vez de dar crédito a quem não
+    pagou ou negar a quem pagou.
+    """
+    if not STRIPE_ENABLED:
+        return None
+    sid = prof.get('stripe_subscription_id')
+    if not sid:
+        return False        # plano pago sem assinatura registrada: não repõe
+    try:
+        s = stripe.Subscription.retrieve(sid)
+        d = s.to_dict() if hasattr(s, 'to_dict') else dict(s)
+        return d.get('status') in ('active', 'trialing')
+    except Exception as e:
+        print('[CREDITS] nao consegui confirmar a assinatura %s: %s' % (sid, e))
+        return None
+
+
+def repor_creditos_se_vencido(prof_uid, prof):
+    """Aplica as reposições vencidas. Devolve o perfil (atualizado ou não)."""
+    if not prof or not CREDITS_ENABLED:
+        return prof
+    plan = prof.get('plan') or 'free'
+    if plan == 'free' or plan not in PLANS:
+        return prof                      # o free é de uso único: não renova
+    venc = _do_iso(prof.get('renova_em'))
+    if not venc:
+        return prof                      # sem data marcada, nada a repor
+    agora = datetime.datetime.utcnow()
+    if venc > agora:
+        return prof
+
+    ativa = assinatura_ativa(prof)
+    if ativa is not True:
+        # False = cancelada/inadimplente (não repõe, e a data fica vencida pra
+        # a tela poder explicar). None = não deu pra perguntar (tenta depois).
+        return prof
+
+    ciclo = prof.get('ciclo') or 'mensal'
+    passo = _passo_do_ciclo(ciclo)
+    saldo = int(prof.get('credits') or 0)
+    ganhou = 0
+    # Enquanto houver ciclos vencidos: quem ficou dois meses sem entrar recebe
+    # os dois. O teto de 24 é só uma trava contra data corrompida virar laço
+    # infinito — sem ele, um 'renova_em' de 1970 rodaria pra sempre.
+    voltas = 0
+    while venc <= agora and voltas < 24:
+        ganhou += creditos_do_ciclo(plan, ciclo)
+        venc = _mais_meses(venc, passo)
+        voltas += 1
+    if not ganhou:
+        return prof
+    novo_saldo = saldo + ganhou          # SOMA: crédito não usado acumula, sem teto
+    try:
+        _sb_rest('PATCH', 'profiles?id=eq.%s' % prof_uid,
+                 {'credits': novo_saldo, 'renova_em': _iso(venc)})
+        print('[CREDITS] %s: +%d credito(s) (%s/%s), proxima em %s'
+              % (prof_uid, ganhou, plan, ciclo, _iso(venc)))
+        prof = dict(prof)
+        prof['credits'] = novo_saldo
+        prof['renova_em'] = _iso(venc)
+    except Exception as e:
+        print('[CREDITS] erro ao repor:', e)
+    return prof
 
 
 def charge_credits(uid, amount):
@@ -332,9 +491,88 @@ def charge_credits(uid, amount):
         return False, have, 'db_indisponivel'
 
 
-def set_plan(uid, plan, extra=None):
-    """Define o plano do usuário e recarrega os créditos pra cota do plano."""
-    patch = {'plan': plan, 'credits': PLANS.get(plan, PLANS['free'])}
+def tem_creditos(uid, quantos):
+    """Só confere o saldo. NÃO cobra.
+
+    A cobrança mudou de lugar: acontece no fim, pelo que foi de fato entregue.
+    Antes o crédito saía na hora de despachar, e se a renderização falhasse a
+    pessoa ficava sem o crédito E sem o vídeo — tentava de novo e perdia de
+    novo. Não existia estorno.
+
+    Conferir antes continua necessário pra não começar um trabalho que a pessoa
+    não pode pagar. Entre esta conferência e a cobrança não dá pra "gastar duas
+    vezes": o bloqueio de geração simultânea garante um job por usuário por vez.
+    """
+    prof = get_or_create_profile(uid)
+    if prof is None:
+        return True, None, 'db_indisponivel'      # fail-open: banco fora não trava o usuário
+    saldo = int(prof.get('credits') or 0)
+    if saldo < quantos:
+        return False, saldo, 'sem_creditos'
+    return True, saldo, None
+
+
+def cobrar_entregues(job_id, j):
+    """Cobra pelo que realmente ficou pronto. Uma vez só.
+
+    Cobrar `completed` e não `count_requested` resolve de graça o caso mais
+    chato: saíram 3 dos 5 pedidos. A pessoa paga 3. Falhou tudo, paga zero —
+    sem lógica de estorno, sem corrida entre cobrar e devolver.
+
+    A marca `cobrado` no job é o que impede cobrar duas vezes, já que este ponto
+    é alcançado tanto pelo aviso do Modal quanto pelo /status que o navegador
+    consulta a cada segundo e meio.
+    """
+    if not (CREDITS_ENABLED and j) or j.get('cobrado'):
+        return j
+    if j.get('status') not in ('done', 'error'):
+        return j
+    uid = j.get('user_id')
+    entregues = int(j.get('completed') or 0)
+    if not uid:
+        return j
+    if entregues <= 0:
+        j['cobrado'] = True                        # nada entregue, nada cobrado
+        j['cobrado_creditos'] = 0
+        save_job(job_id, j)
+        print('[CREDITS] job %s nao entregou nada — nada cobrado' % job_id)
+        return j
+    prof = get_or_create_profile(uid)
+    saldo = int((prof or {}).get('credits') or 0)
+    # Não deveria acontecer (há conferência antes e um job por vez), mas se
+    # acontecer é melhor cobrar o que existe do que deixar o saldo negativo.
+    cobrar = min(entregues, saldo)
+    ok, restantes, err = charge_credits(uid, cobrar) if cobrar else (True, saldo, None)
+    if err and err != 'sem_creditos':
+        return j                                   # banco fora: tenta na próxima consulta
+    j['cobrado'] = True
+    j['cobrado_creditos'] = cobrar
+    save_job(job_id, j)
+    print('[CREDITS] job %s: %d entregue(s), %d cobrado(s), restam %s'
+          % (job_id, entregues, cobrar, restantes))
+    return j
+
+
+def set_plan(uid, plan, ciclo='mensal', extra=None):
+    """Aplica o plano recém-assinado: soma os créditos e marca a próxima data.
+
+    SOMA em vez de substituir. Quem tinha 4 créditos do free e assina o Starter
+    fica com 54, não com 50 — tirar o que a pessoa já tinha no momento em que ela
+    paga é a pior hora possível pra ela sentir que perdeu alguma coisa.
+    """
+    atual = 0
+    try:
+        rows = _sb_rest('GET', 'profiles?id=eq.%s&select=credits' % uid)
+        if rows:
+            atual = int(rows[0].get('credits') or 0)
+    except Exception:
+        atual = 0
+    if ciclo not in CICLOS:
+        ciclo = 'mensal'
+    proxima = _mais_meses(datetime.datetime.utcnow(), _passo_do_ciclo(ciclo))
+    patch = {'plan': plan, 'ciclo': ciclo,
+             'credits': atual + creditos_do_ciclo(plan, ciclo),
+             'renova_em': _iso(proxima)}
     if extra:
         patch.update(extra)
     try:
@@ -360,15 +598,27 @@ def _load_stripe_config():
             d = {}
     sk = (d.get('stripe_secret_key') or os.environ.get('STRIPE_SECRET_KEY', '')).strip()
     wh = (d.get('stripe_webhook_secret') or os.environ.get('STRIPE_WEBHOOK_SECRET', '')).strip()
-    prices = {
-        'starter': (d.get('stripe_price_starter') or os.environ.get('STRIPE_PRICE_STARTER', '')).strip(),
-        'pro':     (d.get('stripe_price_pro') or os.environ.get('STRIPE_PRICE_PRO', '')).strip(),
-    }
+    # Um identificador por plano E por ciclo: no Stripe, "mensal" e "anual" são
+    # dois preços do mesmo produto, não um preço com desconto.
+    # O nome antigo (STRIPE_PRICE_STARTER, sem sufixo) continua valendo como o
+    # mensal — senão a configuração que já está no Render pararia de funcionar
+    # no momento do deploy, e o sintoma seria "sumiram os planos".
+    def pega(plano, ciclo):
+        chave = '%s_%s' % (plano, ciclo)
+        val = (d.get('stripe_price_' + chave)
+               or os.environ.get('STRIPE_PRICE_%s' % chave.upper(), '')).strip()
+        if not val and ciclo == 'mensal':
+            val = (d.get('stripe_price_' + plano)
+                   or os.environ.get('STRIPE_PRICE_%s' % plano.upper(), '')).strip()
+        return val
+
+    prices = {p: {c: pega(p, c) for c in CICLOS} for p in PLANS_PAGOS}
     return sk, wh, prices
 
 
 STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_PRICE_IDS = _load_stripe_config()
-STRIPE_ENABLED = bool(CREDITS_ENABLED and STRIPE_SECRET_KEY and STRIPE_PRICE_IDS.get('starter'))
+STRIPE_ENABLED = bool(CREDITS_ENABLED and STRIPE_SECRET_KEY
+                      and STRIPE_PRICE_IDS.get('starter', {}).get('mensal'))
 stripe = None
 if STRIPE_ENABLED:
     try:
@@ -378,6 +628,53 @@ if STRIPE_ENABLED:
     except Exception as e:
         print('[STRIPE] biblioteca nao instalada (pip install stripe):', e)
         STRIPE_ENABLED = False
+
+
+# ─── PREÇO: QUEM SABE É O STRIPE ──────────────────────────────────────────────
+# O valor NÃO é escrito aqui de propósito. Preço escrito em duas fontes vira
+# preço errado numa delas: você muda no Stripe, cobra R$ 69, e a tela continua
+# anunciando R$ 39 — e o cliente tem razão em reclamar. Então a tela pergunta ao
+# Stripe, que é quem de fato cobra.
+#
+# Cache de 1h porque preço não muda toda hora e cada consulta é uma chamada de
+# rede no meio do carregamento do modal.
+_preco_cache = {}     # price_id -> (dict, expira_em)
+PRECO_TTL = 3600
+
+
+def _fmt_moeda(centavos, moeda):
+    valor = centavos / 100.0
+    if (moeda or '').lower() == 'brl':
+        txt = ('%.2f' % valor).replace('.', ',').replace(',00', '')
+        return 'R$ ' + txt
+    return '%s %.2f' % ((moeda or '').upper(), valor)
+
+
+def preco_do_stripe(price_id):
+    """Devolve {'valor','moeda','texto'} ou None.
+
+    None não é erro fatal: a tela mostra o plano sem o preço em vez de mostrar
+    um número inventado. Preço errado é pior que preço ausente.
+    """
+    if not (STRIPE_ENABLED and price_id):
+        return None
+    agora = time.time()
+    hit = _preco_cache.get(price_id)
+    if hit and hit[1] > agora:
+        return hit[0]
+    try:
+        p = stripe.Price.retrieve(price_id)
+        d = p.to_dict() if hasattr(p, 'to_dict') else dict(p)
+        centavos = d.get('unit_amount')
+        if centavos is None:
+            return None
+        info = {'valor': centavos, 'moeda': d.get('currency', 'brl'),
+                'texto': _fmt_moeda(centavos, d.get('currency', 'brl'))}
+        _preco_cache[price_id] = (info, agora + PRECO_TTL)
+        return info
+    except Exception as e:
+        print('[STRIPE] nao consegui ler o preco %s: %s' % (price_id, e))
+        return None
 
 
 def _find_font():
@@ -1540,8 +1837,15 @@ def me():
     if CREDITS_ENABLED:
         prof = get_or_create_profile(uid, out['email'])
         if prof:
-            out['credits'] = prof.get('credits')
-            out['plan'] = prof.get('plan')
+            plano = prof.get('plan')
+            ciclo = prof.get('ciclo') or 'mensal'
+            creditos = prof.get('credits')
+            out['credits'] = creditos
+            out['plan'] = plano
+            out['ciclo'] = ciclo
+            out['renovaEm'] = prof.get('renova_em')
+            out['cota'] = creditos_do_ciclo(plano, ciclo) if plano in PLANS else None
+            out['acabando'] = saldo_acabando(plano, ciclo, creditos)
     return jsonify(out)
 
 
@@ -1550,20 +1854,32 @@ def billing_plans():
     uid = current_user_id()
     if AUTH_ENABLED and not uid:
         return jsonify({'error': 'unauthorized'}), 401
-    current_plan, credits = 'free', None
+    current_plan, credits, tem_assinatura = 'free', None, False
     if CREDITS_ENABLED:
         prof = get_or_create_profile(uid, current_user_email())
         if prof:
             current_plan = prof.get('plan', 'free')
             credits = prof.get('credits')
+            tem_assinatura = bool(prof.get('stripe_customer_id'))
     plans = []
-    for key in ('starter', 'pro'):
-        pid = STRIPE_PRICE_IDS.get(key)
-        if STRIPE_ENABLED and pid:
-            plans.append({'key': key, 'label': key.capitalize(),
-                          'credits': PLANS[key], 'price_id': pid})
+    for key in PLANS_PAGOS:
+        ids = STRIPE_PRICE_IDS.get(key) or {}
+        # Um plano só aparece se tiver ao menos o mensal configurado. Mostrar um
+        # plano que não dá pra assinar é pior que não mostrar.
+        if not (STRIPE_ENABLED and ids.get('mensal')):
+            continue
+        ciclos = {}
+        for c in CICLOS:
+            pid = ids.get(c)
+            if not pid:
+                continue
+            ciclos[c] = {'price_id': pid, 'preco': preco_do_stripe(pid)}
+        plans.append({'key': key, 'label': PLAN_LABELS.get(key, key.capitalize()),
+                      'credits': PLANS[key], 'ciclos': ciclos})
+    tem_anual = any('anual' in p['ciclos'] for p in plans)
     return jsonify({'stripeEnabled': STRIPE_ENABLED, 'currentPlan': current_plan,
-                    'credits': credits, 'plans': plans})
+                    'credits': credits, 'plans': plans, 'temAnual': tem_anual,
+                    'temAssinatura': tem_assinatura})
 
 
 @app.route('/billing/checkout', methods=['POST'])
@@ -1573,8 +1889,12 @@ def billing_checkout():
     uid = current_user_id()
     if not uid:
         return jsonify({'error': 'unauthorized'}), 401
-    plan = (request.json or {}).get('plan')
-    price_id = STRIPE_PRICE_IDS.get(plan)
+    body = request.json or {}
+    plan = body.get('plan')
+    ciclo = body.get('ciclo') or 'mensal'
+    if ciclo not in CICLOS:
+        return jsonify({'error': 'ciclo_invalido'}), 400
+    price_id = (STRIPE_PRICE_IDS.get(plan) or {}).get(ciclo)
     if not price_id:
         return jsonify({'error': 'plano_invalido'}), 400
     base = request.host_url.rstrip('/')
@@ -1584,7 +1904,7 @@ def billing_checkout():
             line_items=[{'price': price_id, 'quantity': 1}],
             customer_email=current_user_email(),
             client_reference_id=uid,
-            metadata={'uid': uid, 'plan': plan},
+            metadata={'uid': uid, 'plan': plan, 'ciclo': ciclo},
             success_url=base + '/billing/success?session_id={CHECKOUT_SESSION_ID}',
             cancel_url=base + '/?assinatura=cancelada',
         )
@@ -1592,6 +1912,40 @@ def billing_checkout():
     except Exception as e:
         print('[STRIPE] erro no checkout:', e)
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/billing/portal', methods=['POST'])
+def billing_portal():
+    """Manda a pessoa pro Portal do Cliente do Stripe.
+
+    É lá que ela cancela, troca o cartão, vê as cobranças e baixa as notas —
+    tudo hospedado pelo Stripe, nada disso passa por aqui (nem deve: guardar
+    dado de cartão é problema que não vale a pena ter).
+
+    Não existir esse caminho era problema de duas naturezas. Legal, porque o CDC
+    pede que cancelar seja tão fácil quanto contratar. E financeira, porque quem
+    não consegue cancelar não desiste: abre disputa no cartão, que custa taxa,
+    devolve o valor e ainda mancha a reputação da conta no Stripe.
+    """
+    if not STRIPE_ENABLED:
+        return jsonify({'error': 'stripe_desligado'}), 400
+    uid = current_user_id()
+    if not uid:
+        return jsonify({'error': 'unauthorized'}), 401
+    prof = get_or_create_profile(uid)
+    cliente = (prof or {}).get('stripe_customer_id')
+    if not cliente:
+        return jsonify({'error': 'sem_assinatura'}), 400
+    try:
+        s = stripe.billing_portal.Session.create(
+            customer=cliente,
+            return_url=request.host_url.rstrip('/') + '/')
+        return jsonify({'url': s.url})
+    except Exception as e:
+        # Erro mais comum aqui: o Portal existe mas não foi ativado no painel do
+        # Stripe. A mensagem técnica vai pro log; a pessoa recebe algo acionável.
+        print('[STRIPE] erro no portal:', e)
+        return jsonify({'error': 'portal_indisponivel'}), 500
 
 
 @app.route('/billing/success')
@@ -1612,13 +1966,14 @@ def billing_success():
         if sd.get('payment_status') == 'paid':
             uid = sd.get('client_reference_id') or meta.get('uid')
             plan = meta.get('plan', 'free')
+            ciclo = meta.get('ciclo', 'mensal')
             if uid and plan in PLANS:
                 extra = {}
                 if sd.get('customer'):
                     extra['stripe_customer_id'] = sd['customer']
                 if sd.get('subscription'):
                     extra['stripe_subscription_id'] = sd['subscription']
-                set_plan(uid, plan, extra)
+                set_plan(uid, plan, ciclo, extra)
         return redirect('/?assinatura=ok')
     except Exception as e:
         print('[STRIPE] erro no success:', e)
@@ -1650,17 +2005,21 @@ def billing_webhook():
     obj = (event.get('data') or {}).get('object') or {}
     try:
         if etype == 'invoice.paid':
-            cust = obj.get('customer')
-            rows = _sb_rest('GET', 'profiles?stripe_customer_id=eq.%s&select=id,plan' % cust)
-            if rows:
-                pl = rows[0].get('plan', 'free')
-                _sb_rest('PATCH', 'profiles?id=eq.%s' % rows[0]['id'], {'credits': PLANS.get(pl, PLANS['free'])})
+            # NÃO repõe crédito aqui, de propósito. Quem repõe é a data no
+            # perfil. Este bloco chegava a `credits = cota do plano`, o que hoje
+            # APAGARIA o saldo acumulado: quem tivesse 400 guardados voltaria
+            # pra 150 no dia da cobrança — a pessoa perderia crédito justamente
+            # no momento em que pagou por mais.
+            pass
         elif etype == 'customer.subscription.deleted':
             cust = obj.get('customer')
             rows = _sb_rest('GET', 'profiles?stripe_customer_id=eq.%s&select=id' % cust)
             if rows:
+                # Volta pro free e para de renovar, mas o saldo que a pessoa já
+                # tinha FICA: ela pagou por ele. Zerar aqui seria cobrar e não
+                # entregar — e é o tipo de coisa que vira disputa no cartão.
                 _sb_rest('PATCH', 'profiles?id=eq.%s' % rows[0]['id'],
-                         {'plan': 'free', 'credits': PLANS['free']})
+                         {'plan': 'free', 'ciclo': None, 'renova_em': None})
     except Exception as e:
         print('[STRIPE] erro ao processar webhook:', e)
     return '', 200
@@ -1781,7 +2140,9 @@ def generate():
         return jsonify({'error': 'sem_espaco', 'free_mb': round(free)}), 507
 
     if CREDITS_ENABLED:
-        ok, rem, err = charge_credits(uid, count)
+        # Confere, mas NÃO cobra: a cobrança acontece no fim, pelo que foi
+        # entregue. Ver cobrar_entregues().
+        ok, rem, err = tem_creditos(uid, count)
         if err == 'sem_creditos':
             return jsonify({'error': 'sem_creditos', 'credits': rem}), 402
         # db_indisponivel: não trava o usuário — segue e loga
@@ -1821,7 +2182,7 @@ def status(job_id):
     if R2_ENABLED:
         if not job:
             return jsonify({'status': 'not_found'})
-        return jsonify(job)
+        return jsonify(cobrar_entregues(job_id, job))
 
     out_dir = os.path.join(job_dir(job_id), 'output')
     if os.path.exists(out_dir):
@@ -1839,10 +2200,10 @@ def status(job_id):
             job['status'] = 'rendering'
             job['progress'] = max(5, int(len(done) / max(count_req, 1) * 95))
         save_job(job_id, job)
-        return jsonify(job)
+        return jsonify(cobrar_entregues(job_id, job))
     if not job:
         return jsonify({'status': 'not_found'})
-    return jsonify(job)
+    return jsonify(cobrar_entregues(job_id, job))
 
 
 @app.route('/download/<job_id>/<filename>')
@@ -1984,6 +2345,9 @@ def modal_output_meta(job_id, filename):
             j['completed'] = len(j['files'])
         j['progress'] = 100 if j['status'] == 'done' else j.get('progress', 0)
     save_job(job_id, j)
+    # Cobrar AQUI é o que garante que a conta seja fechada mesmo se a pessoa
+    # fechar a aba: este aviso vem do Modal, não do navegador.
+    cobrar_entregues(job_id, j)
     return jsonify({'ok': True})
 
 
@@ -2032,7 +2396,9 @@ def single_generate():
         return jsonify({'error': 'no valid files'}), 400
 
     if CREDITS_ENABLED:
-        ok, rem, err = charge_credits(uid, count)
+        # Confere, mas NÃO cobra: a cobrança acontece no fim, pelo que foi
+        # entregue. Ver cobrar_entregues().
+        ok, rem, err = tem_creditos(uid, count)
         if err == 'sem_creditos':
             shutil.rmtree(job_dir(job_id), ignore_errors=True)
             return jsonify({'error': 'sem_creditos', 'credits': rem}), 402

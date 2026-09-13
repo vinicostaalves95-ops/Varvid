@@ -24,6 +24,15 @@ body.ready{opacity:1}
 .ver{font-size:10px;color:#888;background:#111;border:1px solid #333;padding:2px 8px;border-radius:20px}
 .user{display:none;align-items:center;gap:10px}
 .user .credits{font-size:11px;font-weight:700;color:#000;background:var(--accent);border-radius:20px;padding:4px 11px;align-items:center;gap:5px}
+/* Saldo baixo troca o amarelo "tudo certo" pelo laranja "olha isto". Não é
+   vermelho de propósito: nada quebrou, só está acabando. */
+.user .credits.baixo{background:var(--rev);color:#1a1000}
+.saldo-aviso{display:none}
+.saldo-aviso.show{display:block;font-size:12px;line-height:1.5;color:#f5c88a;
+  background:rgba(251,146,60,.09);border:1px solid rgba(251,146,60,.3);
+  border-radius:10px;padding:9px 12px;margin-bottom:10px}
+.saldo-aviso b{color:#fdba74}
+.saldo-aviso a{color:var(--accent);cursor:pointer;font-weight:600;text-decoration:none;white-space:nowrap}
 .user .em{font-size:12px;color:var(--muted);max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .user .out{font-size:11px;color:#888;background:#111;border:1px solid var(--border2);border-radius:8px;padding:5px 10px;cursor:pointer}
 .user .out:hover{color:#fff;border-color:#444}
@@ -36,7 +45,16 @@ body.ready{opacity:1}
 .modal-title{font-family:'Syne',sans-serif;font-size:19px;font-weight:800}
 .modal-x{width:28px;height:28px;border-radius:50%;background:#1a1a1c;border:1px solid var(--border2);color:#999;cursor:pointer;font-size:13px}
 .modal-sub{font-size:12px;color:var(--muted);margin-bottom:18px}
-.plan-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+/* auto-fit em vez de 3 colunas fixas: com três planos ele dá três colunas em
+   tela larga e quebra sozinho quando não cabe, sem media query. */
+.plan-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:12px}
+.ciclo-sw{display:inline-flex;background:#0d0d0e;border:1px solid var(--border2);border-radius:10px;padding:3px;gap:3px;margin-bottom:14px}
+.ciclo-btn{background:transparent;border:none;color:var(--muted);font-size:12px;font-weight:600;padding:7px 14px;border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:7px}
+.ciclo-btn.on{background:var(--accent);color:#000}
+.ciclo-off{font-size:9.5px;font-weight:700;background:rgba(0,0,0,.16);border-radius:5px;padding:2px 5px}
+.ciclo-btn:not(.on) .ciclo-off{background:rgba(232,255,71,.14);color:var(--accent)}
+.plan-price{font-family:'Syne',sans-serif;font-size:22px;font-weight:800;letter-spacing:-.02em;margin-bottom:1px}
+.plan-per{font-size:11px;color:var(--dim);margin-bottom:12px}
 .plan-card{background:#0d0d0e;border:1px solid var(--border2);border-radius:14px;padding:16px}
 .plan-card.current{border-color:rgba(232,255,71,.5)}
 .plan-name{font-family:'Syne',sans-serif;font-size:16px;font-weight:800;margin-bottom:2px;display:flex;align-items:center}
@@ -259,6 +277,9 @@ body.ready{opacity:1}
            geração falhava sem produzir nada — justo quando é necessário pra
            destravar. Um testador ficou 45 min preso por causa disso. Agora vive
            aqui, ao lado do GERAR, sempre visível. -->
+      <!-- Fica aqui, colado no botão de gerar, porque é o momento em que a
+           informação importa: a pessoa está prestes a gastar crédito. -->
+      <div class="saldo-aviso" id="saldo-aviso"></div>
       <div class="gen-row">
         <button class="btn-gen" id="go" disabled>▶ GERAR VARIAÇÕES</button>
         <button class="btn-ghost btn-clear-all" onclick="clearAll()" title="Limpa a seleção, os resultados e os arquivos no servidor">✕ Limpar</button>
@@ -327,8 +348,14 @@ body.ready{opacity:1}
   <div class="modal">
     <div class="modal-top"><div class="modal-title">Escolha seu plano</div><button class="modal-x" onclick="closePlans()">✕</button></div>
     <div class="modal-sub" id="plansCurrent"></div>
+    <div class="ciclo-sw" id="cicloSw" style="display:none">
+      <button class="ciclo-btn on" id="cicloMensal" onclick="setCiclo('mensal')">Mensal</button>
+      <button class="ciclo-btn" id="cicloAnual" onclick="setCiclo('anual')">Anual <span class="ciclo-off">2 meses grátis</span></button>
+    </div>
     <div class="plan-grid" id="planGrid"></div>
-    <div class="modal-note">Pagamento seguro via Stripe · cancele quando quiser.</div>
+    <div class="modal-note">Pagamento seguro via Stripe · cancele quando quiser.
+      <a id="portalLink" style="display:none" onclick="abrirPortal()">Gerenciar assinatura</a>
+    </div>
   </div>
 </div>
 
@@ -371,6 +398,38 @@ function lerDuracao(file){
     v.src=url;
   });
 }
+/* ── MEDIÇÃO LOCAL DOS TAKES ───────────────────────────────────────────────────
+   O /analyze devolve a duração de cada variante, mas quem mede lá é o ffprobe —
+   e o ffprobe NÃO existe no Render de propósito: o Render só coordena, quem
+   renderiza é o Modal, e instalar o ffmpeg inteiro lá pra ler um metadado seria
+   engordar o serviço pra resolver o sintoma. Resultado: em produção a duração
+   vinha 0 e o contador do Remix simplesmente não aparecia. No computador do
+   desenvolvedor funcionava, o que é o pior tipo de bug — o que só some quando
+   alguém vai olhar.
+
+   O navegador já sabe ler isso (é o que o modo único faz antes de enviar). Então
+   medimos aqui, e o valor do servidor passa a ser só um bônus: quando existe,
+   mandamos nele; quando não, o número continua aparecendo.                     */
+const DURACOES = new Map();
+
+/* O servidor renomeia os arquivos ao salvar (espaço vira _, acento some), então
+   "Hook 1.mp4" volta como "Hook_1.mp4" e a comparação direta falharia. Reduzir
+   os dois lados a letras e números faz os nomes se reencontrarem.
+   Dois arquivos diferentes podem colidir aqui ("hook-1" e "hook 1"); o efeito
+   seria uma estimativa levemente errada, nunca um bloqueio indevido. */
+function chaveArq(nome){ return String(nome||'').toLowerCase().replace(/[^a-z0-9]/g,''); }
+
+async function medirTakes(arquivos){
+  DURACOES.clear();
+  // De 4 em 4: cada leitura cria um <video> na memória, e abrir 30 de uma vez
+  // trava celular fraco — justamente o aparelho de quem grava os takes.
+  for(let i=0;i<arquivos.length;i+=4){
+    const lote=arquivos.slice(i,i+4);
+    const durs=await Promise.all(lote.map(f=>lerDuracao(f)));
+    lote.forEach((f,k)=>{ if(durs[k]!=null) DURACOES.set(chaveArq(f.name), durs[k]); });
+  }
+}
+
 function mostrarDuracao(segundos, contexto){
   const el=$('dur-line');
   if(segundos==null){ el.className='dur-line'; return true; }
@@ -446,6 +505,8 @@ const HTTP_MSG={
 };
 const ERR_MSG={
   sem_creditos:'Créditos insuficientes. Reduza a quantidade ou faça upgrade do plano.',
+  sem_assinatura:'Você ainda não tem uma assinatura para gerenciar.',
+  portal_indisponivel:'A área de assinatura não abriu agora. Tente de novo em instantes — se persistir, me chame.',
   sem_espaco:'O servidor está sem espaço agora. Tente de novo em alguns minutos.',
   geracao_em_andamento:'Você já tem uma geração em andamento. Espere ela terminar, ou use "Limpar" para cancelar e começar de novo.',
   arquivo_grande_demais:'O envio ficou grande demais. Envie menos arquivos por vez, ou vídeos mais curtos.',
@@ -492,13 +553,62 @@ async function readJson(r){
 /* Faz a chamada e já devolve o JSON validado. */
 async function apiJson(url,opts){ return readJson(await api(url,opts)); }
 async function logout(){ if(sb) await sb.auth.signOut(); location.href='/login'; }
+let EU=null;
+
+/* Data legível pra quem não é de tecnologia: "13 de outubro", não "2026-10-13". */
+const MESES=['janeiro','fevereiro','março','abril','maio','junho','julho',
+             'agosto','setembro','outubro','novembro','dezembro'];
+function dataCurta(iso){
+  if(!iso) return null;
+  const d=new Date(String(iso).replace(' ','T'));
+  if(isNaN(d)) return null;
+  const hoje=new Date(), amanha=new Date(hoje.getTime()+864e5);
+  const mesmoDia=(a,b)=>a.toDateString()===b.toDateString();
+  if(mesmoDia(d,hoje)) return 'hoje';
+  if(mesmoDia(d,amanha)) return 'amanhã';
+  return d.getDate()+' de '+MESES[d.getMonth()]
+    +(d.getFullYear()!==hoje.getFullYear() ? ' de '+d.getFullYear() : '');
+}
+
+/* ── AVISO DE SALDO ────────────────────────────────────────────────────────────
+   No mensal isso quase nunca aparece, e é de propósito: existe uma rede embaixo
+   (vira o mês e repõe), então interromper a pessoa seria só barulho.
+
+   No anual é outra história. A próxima reposição pode estar a dez meses de
+   distância, e quem descobre isso com o saldo zerado descobre tarde — no meio
+   de uma campanha. Por isso o aviso vem 12x mais cedo em números absolutos, e
+   por isso ele diz o que fazer, não só que está acabando.                      */
+function avisoDeSaldo(d){
+  const faixa=$('saldo-aviso');
+  if(!faixa) return;
+  if(!(d && d.creditsEnabled && d.acabando)){ faixa.className='saldo-aviso'; return; }
+  const anual = d.ciclo==='anual';
+  const quando = dataCurta(d.renovaEm);
+  const oQueFazer = anual
+    ? 'A próxima recarga automática só vem em '+(quando||'muitos meses')+'.'
+    : (quando ? 'Renova em '+quando+'.' : '');
+  faixa.className='saldo-aviso show';
+  faixa.innerHTML='<b>'+d.credits+' vídeo(s) restantes.</b> '+oQueFazer
+    +' <a onclick="openPlans()">Ver planos</a>';
+}
+
 async function refreshMe(){
   try{
     const d=await (await api('/me')).json();
+    EU=d;
     if(d.email) $('userEmail').textContent=d.email;
     const pill=$('creditsPill');
-    if(d.creditsEnabled && d.credits!=null){ pill.style.display='inline-flex'; pill.textContent='✦ '+d.credits+' créditos'; }
+    if(d.creditsEnabled && d.credits!=null){
+      pill.style.display='inline-flex';
+      pill.textContent='✦ '+d.credits+' créditos';
+      pill.className='credits'+(d.acabando?' baixo':'');
+      // A data de renovação vive no title: quem quer saber passa o mouse, e
+      // quem não quer não tem mais um número na cara o tempo todo.
+      const q=dataCurta(d.renovaEm);
+      pill.title = q ? ('Próxima recarga em '+q) : '';
+    }
     else { pill.style.display='none'; }
+    avisoDeSaldo(d);
   }catch(e){}
 }
 let PLANS_DATA=null;
@@ -508,22 +618,86 @@ async function loadBilling(){
     if(d.stripeEnabled && d.plans && d.plans.length) $('planosBtn').style.display='inline-flex';
   }catch(e){}
 }
+let CICLO='mensal';
+
+/* O preço vem do Stripe, não daqui. Se a consulta falhar, o cartão aparece sem
+   o valor em vez de com um valor inventado — número errado na tela de preço é
+   o pior lugar possível pra uma informação desatualizada. */
+function precoDoPlano(p){
+  const c=(p.ciclos||{})[CICLO];
+  return (c && c.preco) ? c.preco : null;
+}
+function planoTemCiclo(p){ return !!((p.ciclos||{})[CICLO]); }
+
+/* R$ 390 por ano são R$ 32,50 por mês — e é esse número que mostra o desconto.
+   Formatado aqui e não no servidor porque é conta derivada, não preço: o preço
+   continua sendo só o que o Stripe cobra. */
+function equivalenteMensal(pr){
+  const centavos=Math.round((pr.valor||0)/12);
+  if((pr.moeda||'brl').toLowerCase()!=='brl') return pr.texto;
+  const txt=(centavos/100).toFixed(2).replace('.',',').replace(',00','');
+  return 'R$ '+txt;
+}
+
+function setCiclo(c){
+  CICLO=c;
+  $('cicloMensal').className='ciclo-btn'+(c==='mensal'?' on':'');
+  $('cicloAnual').className='ciclo-btn'+(c==='anual'?' on':'');
+  desenharPlanos();
+}
+
+function desenharPlanos(){
+  $('planGrid').innerHTML=(PLANS_DATA.plans||[]).map(p=>{
+    const cur=p.key===PLANS_DATA.currentPlan;
+    const disp=planoTemCiclo(p);
+    const pr=precoDoPlano(p);
+    // No anual mostramos o total cobrado (é o que sai do bolso) e, ao lado, o
+    // equivalente mensal — que é o número com o qual a pessoa compara o plano
+    // mensal e enxerga o desconto. Repetir "vídeos por mês" aqui seria dizer
+    // duas vezes a mesma coisa: a linha de baixo já diz.
+    const linhaPreco = pr
+      ? '<div class="plan-price">'+pr.texto+'</div><div class="plan-per">'
+        +(CICLO==='anual' ? 'por ano · '+equivalenteMensal(pr)+'/mês' : 'por mês')+'</div>'
+      : '<div class="plan-per" style="margin-top:6px">preço no checkout</div>';
+    return '<div class="plan-card'+(cur?' current':'')+'">'
+      +'<div class="plan-name">'+p.label+(cur?'<span class="plan-tag">atual</span>':'')+'</div>'
+      +linhaPreco
+      +'<div class="plan-credits"><b>'+p.credits+'</b> vídeos por mês</div>'
+      +'<button class="plan-btn"'+(cur||!disp?' disabled':'')
+      +' onclick="subscribe(\''+p.key+'\')">'
+      +(cur?'Plano atual':(disp?'Assinar':'Indisponível'))+'</button></div>';
+  }).join('');
+}
+
+/* Cancelar, trocar cartão e baixar nota acontecem no Portal do Stripe. Não
+   reconstruímos isso aqui de propósito: envolveria guardar dado de cartão, que
+   é um problema que não vale a pena ter. */
+async function abrirPortal(){
+  try{
+    const d=await apiJson('/billing/portal',{method:'POST'});
+    if(d.url){ window.location.href=d.url; return; }
+    toast('Não consegui abrir a área de assinatura. Tente de novo em instantes.',true);
+  }catch(e){ toast(friendly(e),true); }
+}
+
 function openPlans(){
   if(!PLANS_DATA) return;
   $('plansCurrent').textContent='Seu plano atual: '+(PLANS_DATA.currentPlan||'free');
-  $('planGrid').innerHTML=PLANS_DATA.plans.map(p=>{
-    const cur=p.key===PLANS_DATA.currentPlan;
-    return '<div class="plan-card'+(cur?' current':'')+'"><div class="plan-name">'+p.label+(cur?'<span class="plan-tag">atual</span>':'')+'</div>'
-      +'<div class="plan-credits"><b>'+p.credits+'</b> vídeos por mês</div>'
-      +'<button class="plan-btn"'+(cur?' disabled':'')+' onclick="subscribe(\''+p.key+'\')">'+(cur?'Plano atual':'Assinar')+'</button></div>';
-  }).join('');
+  // O link só existe pra quem tem assinatura: oferecer "gerenciar" a quem nunca
+  // assinou levaria a uma página vazia do Stripe.
+  $('portalLink').style.display = PLANS_DATA.temAssinatura ? 'inline' : 'none';
+  // O alternador só existe se houver anual configurado no Stripe. Sem isso ele
+  // seria um botão que não leva a lugar nenhum.
+  $('cicloSw').style.display = PLANS_DATA.temAnual ? 'inline-flex' : 'none';
+  if(!PLANS_DATA.temAnual) CICLO='mensal';
+  setCiclo(CICLO);
   $('plansModal').classList.add('show');
 }
 function closePlans(){ $('plansModal').classList.remove('show'); }
 async function subscribe(key){
   try{
     const d=await apiJson('/billing/checkout',{method:'POST',
-      headers:{'Content-Type':'application/json'},body:JSON.stringify({plan:key})});
+      headers:{'Content-Type':'application/json'},body:JSON.stringify({plan:key,ciclo:CICLO})});
     if(d.url){ window.location.href=d.url; }
     else { toast('Não consegui iniciar o pagamento. Tente de novo em instantes.',true); }
   }catch(e){ toast(friendly(e),true); }
@@ -642,7 +816,14 @@ async function _onFiles(fl){
       return;
     }
   }
-  if(mode==='remix'){ analyze(); }
+  if(mode==='remix'){
+    // Medir ANTES de enviar: os arquivos já estão aqui, a leitura é só de
+    // metadado e não custa rede nenhuma. Se deixássemos pro servidor, o número
+    // não apareceria em produção — foi exatamente o que aconteceu.
+    $('badge').innerHTML='<span class="spin"></span> conferindo…'; $('badge').className='badge show';
+    await medirTakes(selectedFiles);
+    analyze();
+  }
   else { $('go').disabled=false; showEmpty(false); }
 }
 
@@ -674,12 +855,28 @@ async function analyze(){
   }
 }
 
-/* Pior caso do vídeo montado: a variante mais longa de cada bloco. Devolve null
-   se o servidor não conseguiu medir (ffprobe ausente), e aí nada é bloqueado. */
+/* Pior caso do vídeo montado: a variante mais longa de cada bloco.
+
+   Duas fontes, nesta ordem: o servidor, quando conseguiu medir (ambiente local,
+   com ffprobe), e a medição do navegador, que é a que vale em produção. Se as
+   duas falharem devolve null — e null não bloqueia nada, porque impedir alguém
+   de gerar por causa de um codec que não soubemos ler seria trocar um contador
+   ausente por uma ferramenta travada. */
+function duracaoVariante(v){
+  if(v && v.duration>0) return v.duration;               // servidor mediu
+  const arqs=(v && v.files)||[];
+  let soma=0, achou=false;
+  arqs.forEach(nome=>{
+    const d=DURACOES.get(chaveArq(nome));
+    if(d!=null){ soma+=d; achou=true; }
+  });
+  return achou ? soma : 0;   // uma variante é a soma das suas partes (_pt1, _pt2…)
+}
+
 function duracaoMontada(summary){
   let total=0, mediu=false;
   Object.values(summary||{}).forEach(variantes=>{
-    const maior=Math.max(...variantes.map(v=>v.duration||0));
+    const maior=Math.max(...variantes.map(duracaoVariante));
     if(maior>0){ total+=maior; mediu=true; }
   });
   return mediu ? total : null;
@@ -835,6 +1032,7 @@ async function downloadAll(){ for(const f of results){ await dl(f); await new Pr
 
 function clearSelection(){          // só a seleção local, não mexe no servidor
   selectedFiles=[];
+  DURACOES.clear();                 // medições da seleção antiga não valem pra próxima
   $('file').value='';               // <- é isto que devolve o evento 'change'
   $('badge').innerHTML='✦ <span id="fcount">0</span> arquivo(s)';
   $('badge').className='badge';
