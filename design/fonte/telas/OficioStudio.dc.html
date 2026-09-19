@@ -1,0 +1,254 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap">
+  <style>
+    body { margin: 0; }
+    a { color: #14130F; } a:hover { color: #7A6A12; }
+  </style>
+</helmet>
+
+<div style="width: 1440px; height: 900px; background: #F5F4F0; color: #14130F; font-family: 'Poppins', system-ui, sans-serif; font-size: 14px; display: flex; flex-direction: column; overflow: hidden;">
+
+  <!-- ── topo ─────────────────────────────────────────── -->
+  <div style="height: 62px; flex-shrink: 0; background: #FFFFFF; border-bottom: 1px solid #E4E1D9; display: flex; align-items: center; justify-content: space-between; padding: 0 24px;">
+    <div style="display: flex; align-items: center; gap: 10px;">
+      <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><rect x="6.5" y="1.5" width="14" height="14" rx="4" fill="#FFC700"></rect><rect x="1.5" y="6.5" width="14" height="14" rx="4" fill="#14130F"></rect></svg>
+      <span style="font-size: 17px; font-weight: 700; letter-spacing: -0.025em;">Varvid</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <div style="display: flex; align-items: center; gap: 7px; background: #14130F; color: #FFFFFF; border-radius: 999px; padding: 6px 13px 6px 10px; font-size: 12px; font-weight: 600;">
+        <span style="width: 7px; height: 7px; border-radius: 50%; background: #FFC700;"></span>50 créditos
+      </div>
+      <button style="font-family: inherit; font-size: 12.5px; font-weight: 600; color: #14130F; background: transparent; border: 1px solid #D9D5CB; border-radius: 8px; padding: 7px 13px; cursor: pointer;">Planos</button>
+      <span style="font-size: 12.5px; color: #6F6C63;">vinicius@omnisblue.com.br</span>
+      <button style="font-family: inherit; font-size: 12.5px; color: #6F6C63; background: transparent; border: none; cursor: pointer;">Sair</button>
+    </div>
+  </div>
+
+  <div style="flex: 1; display: grid; grid-template-columns: 248px 1fr 348px; min-height: 0;">
+
+    <!-- ── trilho esquerdo ────────────────────────────── -->
+    <div style="background: #FFFFFF; border-right: 1px solid #E4E1D9; padding: 22px 18px; display: flex; flex-direction: column; gap: 22px;">
+      <div style="display: flex; flex-direction: column; gap: 9px;">
+        <div style="font-size: 10.5px; font-weight: 700; letter-spacing: 0.13em; text-transform: uppercase; color: #9C988D;">Modo</div>
+        <div style="display: flex; flex-direction: column; gap: 7px;">
+          <div style="background: #14130F; color: #FFFFFF; border-radius: 11px; padding: 13px 14px; display: flex; align-items: flex-start; gap: 11px;">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#FFC700" stroke-width="1.8" style="flex-shrink: 0; margin-top: 1px;"><rect x="3" y="3" width="7" height="7" rx="1.5"></rect><rect x="14" y="3" width="7" height="7" rx="1.5"></rect><rect x="3" y="14" width="7" height="7" rx="1.5"></rect><rect x="14" y="14" width="7" height="7" rx="1.5"></rect></svg>
+            <div style="display: flex; flex-direction: column; gap: 2px;">
+              <div style="font-size: 13.5px; font-weight: 600;">Remix de takes</div>
+              <div style="font-size: 11.5px; color: #A8A49A; line-height: 1.4;">Ele monta o vídeo a partir dos seus blocos</div>
+            </div>
+          </div>
+          <div style="background: #FFFFFF; border: 1px solid #E4E1D9; border-radius: 11px; padding: 13px 14px; display: flex; align-items: flex-start; gap: 11px;">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#8C887E" stroke-width="1.8" style="flex-shrink: 0; margin-top: 1px;"><polygon points="23 7 16 12 23 17 23 7"></polygon><rect x="1" y="5" width="15" height="14" rx="2"></rect></svg>
+            <div style="display: flex; flex-direction: column; gap: 2px;">
+              <div style="font-size: 13.5px; font-weight: 600;">Vídeo único</div>
+              <div style="font-size: 11.5px; color: #8C887E; line-height: 1.4;">Você já tem o vídeo pronto</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="height: 1px; background: #EDEAE3;"></div>
+
+      <div style="display: flex; flex-direction: column; gap: 10px;">
+        <div style="display: flex; align-items: center; justify-content: space-between;">
+          <div style="font-size: 10.5px; font-weight: 700; letter-spacing: 0.13em; text-transform: uppercase; color: #9C988D;">Nomes dos blocos</div>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#B4AFA3" stroke-width="2"><path d="M6 9l6 6 6-6"></path></svg>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 6px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+            <span style="font-size: 12.5px; font-weight: 500;">Hook</span>
+            <span style="font-family: ui-monospace, 'SF Mono', monospace; font-size: 11px; color: #6F6C63; background: #F5F4F0; border-radius: 5px; padding: 3px 7px;">Hook1.mp4</span>
+          </div>
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+            <span style="font-size: 12.5px; font-weight: 500;">CTA</span>
+            <span style="font-family: ui-monospace, 'SF Mono', monospace; font-size: 11px; color: #6F6C63; background: #F5F4F0; border-radius: 5px; padding: 3px 7px;">CTA1.mp4</span>
+          </div>
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+            <span style="font-size: 12.5px; font-weight: 500;">Story</span>
+            <span style="font-family: ui-monospace, 'SF Mono', monospace; font-size: 11px; color: #6F6C63; background: #F5F4F0; border-radius: 5px; padding: 3px 7px;">Story.mp4</span>
+          </div>
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+            <span style="font-size: 12.5px; font-weight: 500;">Revelação</span>
+            <span style="font-family: ui-monospace, 'SF Mono', monospace; font-size: 11px; color: #6F6C63; background: #F5F4F0; border-radius: 5px; padding: 3px 7px;">Revelacao.mp4</span>
+          </div>
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+            <span style="font-size: 12.5px; font-weight: 500;">Prova</span>
+            <span style="font-family: ui-monospace, 'SF Mono', monospace; font-size: 11px; color: #6F6C63; background: #F5F4F0; border-radius: 5px; padding: 3px 7px;">Prova.mp4</span>
+          </div>
+        </div>
+        <div style="font-size: 11.5px; line-height: 1.5; color: #6F6C63; background: #FBFAF7; border: 1px solid #EDEAE3; border-radius: 9px; padding: 10px 11px;">Numere para multiplicar: <span style="font-family: ui-monospace, monospace; color: #14130F;">Hook1</span>, <span style="font-family: ui-monospace, monospace; color: #14130F;">Hook2</span>. Bloco longo quebra em <span style="font-family: ui-monospace, monospace; color: #14130F;">_pt1</span>, <span style="font-family: ui-monospace, monospace; color: #14130F;">_pt2</span>.</div>
+      </div>
+    </div>
+
+    <!-- ── centro ─────────────────────────────────────── -->
+    <div style="padding: 26px 30px; display: flex; flex-direction: column; gap: 18px; min-height: 0; overflow: hidden;">
+
+      <div style="background: linear-gradient(180deg, #EAE7DE 0%, rgba(245, 244, 240, 0) 100%); border-radius: 14px; padding: 15px 18px 22px; display: flex; align-items: flex-end; justify-content: space-between; gap: 16px;">
+        <div style="display: flex; flex-direction: column; gap: 3px;">
+          <h1 style="margin: 0; font-size: 25px; font-weight: 700; letter-spacing: -0.025em;">Remix de takes</h1>
+          <div style="font-size: 13px; color: #6F6C63;">Seis arquivos reconhecidos · nenhum bloco faltando</div>
+        </div>
+        <button style="font-family: inherit; font-size: 12.5px; font-weight: 600; color: #6F6C63; background: transparent; border: 1px solid #D9D5CB; border-radius: 8px; padding: 8px 14px; display: flex; align-items: center; gap: 6px; cursor: pointer;">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 6 6 18M6 6l12 12"></path></svg>Trocar takes
+        </button>
+      </div>
+
+      <!-- arquivos -->
+      <div style="background: #FFFFFF; border: 1px solid #E4E1D9; border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 12px;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+          <div style="display: flex; align-items: center; gap: 10px; border: 1px solid #EDEAE3; border-radius: 10px; padding: 10px 12px;">
+            <span style="width: 6px; height: 24px; border-radius: 3px; background: #FFC700;"></span>
+            <div style="display: flex; flex-direction: column; gap: 1px; flex-grow: 1;"><span style="font-size: 13px; font-weight: 600;">Hook1.mp4</span><span style="font-size: 11px; color: #9C988D;">Hook · 4s</span></div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 10px; border: 1px solid #EDEAE3; border-radius: 10px; padding: 10px 12px;">
+            <span style="width: 6px; height: 24px; border-radius: 3px; background: #FFC700;"></span>
+            <div style="display: flex; flex-direction: column; gap: 1px; flex-grow: 1;"><span style="font-size: 13px; font-weight: 600;">Hook2.mp4</span><span style="font-size: 11px; color: #9C988D;">Hook · 5s</span></div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 10px; border: 1px solid #EDEAE3; border-radius: 10px; padding: 10px 12px;">
+            <span style="width: 6px; height: 24px; border-radius: 3px; background: #FFC700;"></span>
+            <div style="display: flex; flex-direction: column; gap: 1px; flex-grow: 1;"><span style="font-size: 13px; font-weight: 600;">Hook3.mp4</span><span style="font-size: 11px; color: #9C988D;">Hook · 4s</span></div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 10px; border: 1px solid #EDEAE3; border-radius: 10px; padding: 10px 12px;">
+            <span style="width: 6px; height: 24px; border-radius: 3px; background: #14130F;"></span>
+            <div style="display: flex; flex-direction: column; gap: 1px; flex-grow: 1;"><span style="font-size: 13px; font-weight: 600;">Story.mp4</span><span style="font-size: 11px; color: #9C988D;">Story · 18s</span></div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 10px; border: 1px solid #EDEAE3; border-radius: 10px; padding: 10px 12px;">
+            <span style="width: 6px; height: 24px; border-radius: 3px; background: #14130F;"></span>
+            <div style="display: flex; flex-direction: column; gap: 1px; flex-grow: 1;"><span style="font-size: 13px; font-weight: 600;">Prova.mp4</span><span style="font-size: 11px; color: #9C988D;">Prova · 9s</span></div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 10px; border: 1px solid #EDEAE3; border-radius: 10px; padding: 10px 12px;">
+            <span style="width: 6px; height: 24px; border-radius: 3px; background: #FFC700;"></span>
+            <div style="display: flex; flex-direction: column; gap: 1px; flex-grow: 1;"><span style="font-size: 13px; font-weight: 600;">CTA1.mp4</span><span style="font-size: 11px; color: #9C988D;">CTA · 6s</span></div>
+          </div>
+        </div>
+        <div style="border: 1px dashed #D2CDC1; border-radius: 10px; padding: 13px; display: flex; align-items: center; justify-content: center; gap: 9px; color: #8C887E;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+          <span style="font-size: 12.5px; font-weight: 500;">Arraste mais takes ou clique para adicionar</span>
+        </div>
+      </div>
+
+      <!-- ajustes -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+        <div style="background: #FFFFFF; border: 1px solid #E4E1D9; border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 11px;">
+          <div style="font-size: 10.5px; font-weight: 700; letter-spacing: 0.13em; text-transform: uppercase; color: #9C988D;">Quantas variações</div>
+          <div style="display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px;">
+            <div style="height: 40px; border: 1px solid #E4E1D9; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 600; color: #8C887E;">5</div>
+            <div style="height: 40px; border: 1px solid #E4E1D9; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 600; color: #8C887E;">10</div>
+            <div style="height: 40px; border: 1px solid #14130F; background: #14130F; color: #FFC700; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700;">15</div>
+            <div style="height: 40px; border: 1px solid #E4E1D9; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 600; color: #8C887E;">20</div>
+            <div style="height: 40px; border: 1px solid #E4E1D9; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 600; color: #8C887E;">25</div>
+            <div style="height: 40px; border: 1px solid #E4E1D9; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 600; color: #8C887E;">30</div>
+          </div>
+          <div style="font-size: 11.5px; color: #6F6C63;">Cada variação consome 1 crédito, cobrado só na entrega.</div>
+        </div>
+
+        <div style="background: #FFFFFF; border: 1px solid #E4E1D9; border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 11px;">
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <div style="font-size: 10.5px; font-weight: 700; letter-spacing: 0.13em; text-transform: uppercase; color: #9C988D;">Headline no vídeo</div>
+            <span style="font-size: 11px; color: #B4AFA3;">opcional</span>
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <div style="flex-grow: 1; border: 1px solid #E4E1D9; border-radius: 9px; padding: 10px 12px; font-size: 13px; color: #14130F; line-height: 1.45; min-height: 62px;">Ninguém te contou isso sobre tráfego pago</div>
+            <div style="width: 78px; border: 1px solid #E4E1D9; border-radius: 9px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; padding: 8px 0;">
+              <span style="font-size: 22px; font-weight: 700; letter-spacing: -0.022em;">3</span>
+              <span style="font-size: 10px; color: #9C988D;">segundos</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- resultados -->
+      <div style="background: #FFFFFF; border: 1px solid #E4E1D9; border-radius: 14px; padding: 15px 16px; display: flex; flex-direction: column; gap: 12px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+          <div style="display: flex; align-items: center; gap: 9px;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#14130F" stroke-width="2.4"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            <span style="font-size: 14.5px; font-weight: 600;">12 vídeos prontos</span>
+            <span style="font-size: 12px; color: #9C988D;">· disponíveis por 48 horas</span>
+          </div>
+          <button style="font-family: inherit; font-size: 12.5px; font-weight: 600; color: #FFFFFF; background: #14130F; border: none; border-radius: 8px; padding: 9px 15px; display: flex; align-items: center; gap: 7px; cursor: pointer;">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>Baixar todos
+          </button>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 7px;">
+          <div style="aspect-ratio: 9 / 16; border-radius: 7px; background: #EFEDE6; border: 1px solid #E4E1D9;"></div>
+          <div style="aspect-ratio: 9 / 16; border-radius: 7px; background: #EFEDE6; border: 1px solid #E4E1D9;"></div>
+          <div style="aspect-ratio: 9 / 16; border-radius: 7px; background: #EFEDE6; border: 1px solid #E4E1D9;"></div>
+          <div style="aspect-ratio: 9 / 16; border-radius: 7px; background: #EFEDE6; border: 1px solid #E4E1D9;"></div>
+          <div style="aspect-ratio: 9 / 16; border-radius: 7px; background: #EFEDE6; border: 1px solid #E4E1D9;"></div>
+          <div style="aspect-ratio: 9 / 16; border-radius: 7px; background: #EFEDE6; border: 1px solid #E4E1D9;"></div>
+          <div style="aspect-ratio: 9 / 16; border-radius: 7px; background: #EFEDE6; border: 1px solid #E4E1D9;"></div>
+          <div style="aspect-ratio: 9 / 16; border-radius: 7px; background: #EFEDE6; border: 1px solid #E4E1D9;"></div>
+          <div style="aspect-ratio: 9 / 16; border-radius: 7px; background: #EFEDE6; border: 1px solid #E4E1D9;"></div>
+          <div style="aspect-ratio: 9 / 16; border-radius: 7px; background: #EFEDE6; border: 1px solid #E4E1D9;"></div>
+          <div style="aspect-ratio: 9 / 16; border-radius: 7px; background: #EFEDE6; border: 1px solid #E4E1D9;"></div>
+          <div style="aspect-ratio: 9 / 16; border-radius: 7px; background: #EFEDE6; border: 1px solid #E4E1D9;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── resumo à direita ───────────────────────────── -->
+    <div style="background: #FFFFFF; border-left: 1px solid #E4E1D9; display: flex; flex-direction: column; min-height: 0;">
+      <div style="padding: 22px 20px 0; display: flex; flex-direction: column; gap: 18px; flex-grow: 1;">
+        <div style="font-size: 10.5px; font-weight: 700; letter-spacing: 0.13em; text-transform: uppercase; color: #9C988D;">Estrutura detectada</div>
+
+        <div style="display: flex; flex-direction: column; gap: 12px;">
+          <div style="display: flex; flex-direction: column; gap: 7px;">
+            <div style="font-size: 12px; font-weight: 600; color: #6F6C63;">Giram entre si</div>
+            <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+              <span style="font-size: 12px; font-weight: 600; background: #FFF6D4; border: 1px solid #F2DE93; border-radius: 7px; padding: 5px 10px;">Hook ×3</span>
+              <span style="font-size: 12px; font-weight: 600; background: #FFF6D4; border: 1px solid #F2DE93; border-radius: 7px; padding: 5px 10px;">CTA ×1</span>
+            </div>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 7px;">
+            <div style="font-size: 12px; font-weight: 600; color: #6F6C63;">Ficam iguais</div>
+            <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+              <span style="font-size: 12px; font-weight: 500; background: #F5F4F0; border: 1px solid #E4E1D9; border-radius: 7px; padding: 5px 10px; color: #6F6C63;">Story</span>
+              <span style="font-size: 12px; font-weight: 500; background: #F5F4F0; border: 1px solid #E4E1D9; border-radius: 7px; padding: 5px 10px; color: #6F6C63;">Prova</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="background: #F5F4F0; border: 1px solid #E4E1D9; border-radius: 12px; padding: 15px 16px; display: flex; flex-direction: column; gap: 12px;">
+          <div style="display: flex; align-items: flex-end; gap: 12px;">
+            <div style="display: flex; flex-direction: column;">
+              <span style="font-size: 46px; font-weight: 700; letter-spacing: -0.032em; line-height: 1;">3</span>
+              <span style="font-size: 12.5px; color: #6F6C63; margin-top: 4px;">combinações de takes</span>
+            </div>
+            <span style="font-family: ui-monospace, monospace; font-size: 11.5px; color: #B4AFA3; padding-bottom: 6px;">3 × 1</span>
+          </div>
+          <div style="font-size: 11.5px; line-height: 1.55; color: #6F6C63; border-top: 1px solid #E4E1D9; padding-top: 11px;">Esgotadas as combinações, o Varvid aplica micro-cortes e zoom para continuar gerando arquivos únicos.</div>
+        </div>
+
+        <div style="background: #F5F4F0; border: 1px solid #E4E1D9; border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 9px;">
+          <div style="display: flex; align-items: center; justify-content: space-between;"><span style="font-size: 13px; color: #6F6C63;">Vídeos a gerar</span><span style="font-size: 13px; font-weight: 600;">15</span></div>
+          <div style="display: flex; align-items: center; justify-content: space-between;"><span style="font-size: 13px; color: #6F6C63;">Créditos</span><span style="font-size: 13px; font-weight: 600;">15</span></div>
+          <div style="display: flex; align-items: center; justify-content: space-between;"><span style="font-size: 13px; color: #6F6C63;">Saldo depois</span><span style="font-size: 13px; font-weight: 600;">35</span></div>
+        </div>
+      </div>
+
+      <div style="border-top: 1px solid #E4E1D9; padding: 16px 20px; display: flex; flex-direction: column; gap: 9px; flex-shrink: 0;">
+        <div style="display: flex; gap: 8px;">
+          <button style="flex-grow: 1; height: 52px; font-family: inherit; font-size: 14.5px; font-weight: 700; letter-spacing: 0.01em; color: #14130F; background: #FFC700; border: none; border-radius: 10px; display: flex; align-items: center; justify-content: center; gap: 9px; cursor: pointer;">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20 6 4"></polygon></svg>Gerar variações
+          </button>
+          <button style="width: 52px; height: 52px; font-family: inherit; color: #8C887E; background: transparent; border: 1px solid #D9D5CB; border-radius: 10px; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path></svg>
+          </button>
+        </div>
+        <div style="font-size: 11.5px; color: #9C988D; text-align: center;">Cada vídeo pode ter até 1min30.</div>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

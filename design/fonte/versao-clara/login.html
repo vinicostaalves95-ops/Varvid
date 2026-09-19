@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Entrar · varvid</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ─────────────────────────────────────────────────────────────────────────────
+   varvid · login — direção Console
+   Única tela escura do produto e a única com movimento: ela tem um trabalho só,
+   que é mostrar em três segundos o que o varvid faz. Depois do login tudo fica
+   claro e parado.
+   ───────────────────────────────────────────────────────────────────────────── */
+:root{
+  --grafite:#101318; --amarelo:#FFC700; --amarelo2:#FFD336;
+  --escuro:#0A0D11; --linha-esc:#232A33;
+  --branco:#FFFFFF; --linha:#E3E6EA; --linha2:#EBEEF1; --campo:#D5DAE1;
+  --t2:#4A525E; --t3:#5B6470; --t4:#8A93A0; --t-esc:#9AA3AF; --t-esc2:#6B7480;
+  --err:#C0392B; --err-bg:#FDF0EE; --ok:#1E7A4F; --ok-bg:#EEF7F2;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{min-height:100%}
+body{background:var(--escuro);color:#fff;
+  font-family:'Poppins',system-ui,-apple-system,'Segoe UI',sans-serif;font-size:14px;
+  -webkit-font-smoothing:antialiased}
+
+/* O leque respira: cada cartão sobe e desce no seu tempo, então a cena nunca
+   fica parada nem pulsa junto. */
+@keyframes vv-flutuar{from{transform:translateY(0)}to{transform:translateY(-20px)}}
+@keyframes vv-brilhar{0%,100%{opacity:.5;transform:scale(1)}50%{opacity:.85;transform:scale(1.12)}}
+/* Uma faixa de luz percorre o cartão da frente, como um render passando. */
+@keyframes vv-varrer{0%{transform:translateY(-120%);opacity:0}12%,38%{opacity:1}55%,100%{transform:translateY(320%);opacity:0}}
+@media (prefers-reduced-motion: reduce){
+  .carta,.brilho,.varredura{animation:none!important}
+}
+
+.palco{position:relative;min-height:100vh;overflow:hidden}
+.brilho{position:absolute;width:900px;height:900px;left:-180px;top:120px;border-radius:50%;
+  background:radial-gradient(circle,rgba(255,199,0,.16) 0%,rgba(255,199,0,.05) 42%,rgba(255,199,0,0) 68%);
+  animation:vv-brilhar 9s ease-in-out infinite;pointer-events:none}
+.grade{position:absolute;inset:0;pointer-events:none;
+  background-image:linear-gradient(rgba(255,255,255,.028) 1px,transparent 1px),
+                   linear-gradient(90deg,rgba(255,255,255,.028) 1px,transparent 1px);
+  background-size:64px 64px}
+.veu{position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(160deg,rgba(10,13,17,0) 30%,var(--escuro) 92%)}
+
+.split{position:relative;min-height:100vh;display:grid;grid-template-columns:1fr 540px}
+
+/* ── lado da mensagem ─────────────────────────────────────────────────────── */
+.brand{position:relative;padding:52px 0 0 64px;display:flex;flex-direction:column;overflow:hidden}
+.logo{display:flex;align-items:center;gap:10px}
+.logo .nm{font-size:19px;font-weight:700;letter-spacing:-.022em}
+.hero{margin-top:clamp(28px,6vh,58px);display:flex;flex-direction:column;gap:22px;max-width:620px}
+.hero h1{font-size:clamp(40px,5vw,72px);font-weight:700;letter-spacing:-.038em;line-height:1;text-wrap:pretty}
+.hero h1 span{display:block}
+.hero h1 .l1{color:#fff}
+.hero h1 .l2{color:var(--amarelo)}
+.hero h1 .l3{color:var(--t-esc2)}
+.hero p{font-size:17px;line-height:1.62;color:var(--t-esc);max-width:470px}
+.selos{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:2px}
+.selo{font-size:12.5px;color:var(--t-esc);border:1px solid var(--linha-esc);border-radius:999px;padding:7px 15px}
+.selo.on{color:var(--grafite);background:var(--amarelo);border-color:var(--amarelo);font-weight:500}
+
+/* ── o leque: um vídeo que virou muitos ──────────────────────────────────── */
+.leque{position:absolute;left:56px;bottom:-104px;width:920px;height:460px;perspective:1500px;pointer-events:none}
+.leque-in{position:absolute;inset:0;transform-style:preserve-3d;transform:rotateY(-26deg) rotateX(12deg)}
+.slot{position:absolute}
+.carta{animation:vv-flutuar 5.2s ease-in-out infinite alternate}
+.tela{width:154px;height:274px;border-radius:16px;border:1px solid #1E252E;
+  background:linear-gradient(165deg,#161B21 0%,#0E1216 100%)}
+.s1{left:86px;top:16px}   .s2{left:172px;top:32px;transform:translateZ(-86px)}
+.s3{left:258px;top:48px;transform:translateZ(-172px)} .s4{left:344px;top:64px;transform:translateZ(-258px)}
+.s5{left:430px;top:80px;transform:translateZ(-344px)} .s6{left:516px;top:96px;transform:translateZ(-430px)}
+.tela.t1{position:relative;overflow:hidden;border-color:#3A4652;
+  background:linear-gradient(165deg,#232E39 0%,#151D25 100%);box-shadow:0 30px 60px rgba(0,0,0,.5)}
+.tela.t2{border-color:#2B3742;background:linear-gradient(165deg,#1E2730 0%,#131A21 100%)}
+.tela.t3{border-color:#27313C;background:linear-gradient(165deg,#1B232C 0%,#11181E 100%)}
+.tela.t4{border-color:#242D37;background:linear-gradient(165deg,#192028 0%,#10161B 100%)}
+.tela.t5{border-color:#212932;background:linear-gradient(165deg,#171D24 0%,#0F1418 100%)}
+.varredura{position:absolute;left:0;right:0;top:0;height:40%;animation:vv-varrer 4.2s ease-in-out infinite;
+  background:linear-gradient(180deg,rgba(255,199,0,0) 0%,rgba(255,199,0,.22) 50%,rgba(255,199,0,0) 100%)}
+.play{position:absolute;inset:0;display:grid;place-items:center}
+.play span{width:44px;height:44px;border-radius:50%;background:var(--amarelo);display:grid;place-items:center}
+.tag-orig{position:absolute;left:12px;top:12px;font-family:ui-monospace,monospace;font-size:9.5px;
+  color:var(--grafite);background:var(--amarelo);border-radius:4px;padding:3px 7px}
+.tag-v{position:absolute;left:12px;bottom:12px;font-family:ui-monospace,monospace;font-size:9.5px;color:#7C8593}
+
+/* ── lado do acesso ──────────────────────────────────────────────────────── */
+.auth{position:relative;padding:40px 56px;display:flex;flex-direction:column;justify-content:center;gap:20px}
+.auth::before{content:'';position:absolute;left:0;top:0;bottom:0;width:1px;
+  background:linear-gradient(180deg,rgba(255,255,255,0) 0%,rgba(255,255,255,.1) 45%,rgba(255,255,255,0) 100%)}
+.card{position:relative;background:var(--branco);color:var(--grafite);border-radius:18px;padding:30px;
+  display:flex;flex-direction:column;gap:18px;box-shadow:0 40px 90px rgba(0,0,0,.55)}
+.card h2{font-size:24px;font-weight:700;letter-spacing:-.028em}
+.sub{font-size:13px;color:var(--t3);margin-top:-14px}
+
+#authForm{display:flex;flex-direction:column;gap:14px}
+.gbtn{width:100%;height:46px;font-family:inherit;font-size:13.5px;font-weight:500;color:var(--grafite);
+  background:var(--branco);border:1px solid var(--campo);border-radius:9px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;gap:10px}
+.gbtn:hover{border-color:var(--grafite)}
+.gbtn svg{width:16px;height:16px}
+.divider{display:flex;align-items:center;gap:12px;font-size:11.5px;color:var(--t4)}
+.divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--linha2)}
+
+.field{display:flex;flex-direction:column;gap:6px}
+.field label{font-size:12px;font-weight:500;color:var(--t3)}
+.field input{height:46px;border:1px solid var(--campo);border-radius:9px;padding:0 13px;
+  font-family:inherit;font-size:13.5px;color:var(--grafite);background:var(--branco);outline:none}
+.field input:focus{border-color:var(--grafite);border-width:1.5px;padding:0 12.5px}
+.field input::placeholder{color:#A3ABB6}
+.forgot{display:flex;justify-content:flex-end;margin-top:-4px}
+.forgot a,.swap a{color:var(--grafite);cursor:pointer;text-decoration:none;font-weight:500}
+.forgot a{font-size:11.5px;color:var(--t3)}
+.forgot a:hover,.swap a:hover{color:#8A6E00}
+
+.submit{width:100%;height:50px;font-family:inherit;font-size:15px;font-weight:600;color:var(--grafite);
+  background:linear-gradient(180deg,var(--amarelo) 0%,var(--amarelo2) 100%);border:none;border-radius:9px;
+  cursor:pointer;letter-spacing:.005em}
+.submit:hover{filter:brightness(1.04)}
+.submit:disabled{opacity:.5;cursor:default;filter:none}
+.swap{font-size:13px;color:var(--t3);text-align:center}
+
+/* A faixa de recado: o JS liga com class="msg show ok|err|info". */
+.msg{display:none;font-size:12.5px;line-height:1.55;border-radius:9px;padding:11px 13px}
+.msg.show{display:block}
+.msg.err{color:var(--err);background:var(--err-bg);border:1px solid #F3D5D0}
+.msg.ok{color:var(--ok);background:var(--ok-bg);border:1px solid #CFE7DA}
+.msg.info{color:var(--t2);background:#F7F8FA;border:1px solid var(--linha2)}
+.msg b{font-weight:600}
+
+.terms{font-size:11.5px;line-height:1.6;color:var(--t-esc2);text-align:center}
+.terms a{color:var(--t-esc);text-decoration:underline}
+
+/* ── telas menores ───────────────────────────────────────────────────────── */
+@media (max-width:1180px){
+  .leque{left:20px;bottom:-150px;transform:scale(.82);transform-origin:left bottom}
+}
+@media (max-width:960px){
+  .split{grid-template-columns:1fr}
+  .brand{padding:34px 24px 0;min-height:auto}
+  .leque{display:none}
+  .hero{margin-top:26px;gap:16px}
+  .hero p{font-size:15px}
+  .auth{padding:28px 24px 40px}
+  .auth::before{display:none}
+  .card{box-shadow:0 20px 50px rgba(0,0,0,.45)}
+}
+@media (max-width:420px){
+  .brand{padding:24px 16px 0}
+  .auth{padding:22px 16px 32px}
+  .card{padding:22px;border-radius:14px}
+  .selos{gap:7px}
+  .selo{font-size:11.5px;padding:6px 12px}
+}
+</style></head>
+<body>
+
+<div class="palco">
+  <div class="brilho"></div>
+  <div class="grade"></div>
+  <div class="veu"></div>
+
+  <div class="split">
+
+    <!-- ── a mensagem ─────────────────────────────────────────── -->
+    <div class="brand">
+      <div class="logo">
+        <svg viewBox="0 0 22 22" width="24" height="24" fill="none" aria-hidden="true"><rect x="1" y="6" width="4" height="10" rx="2" fill="#fff"/><rect x="7" y="2" width="4" height="18" rx="2" fill="#fff"/><rect x="13" y="5" width="4" height="12" rx="2" fill="#FFC700"/><rect x="19" y="8" width="3" height="6" rx="1.5" fill="#fff" opacity=".35"/></svg>
+        <span class="nm">varvid</span>
+      </div>
+
+      <div class="hero">
+        <h1><span class="l1">Um take.</span><span class="l2">Trinta criativos.</span><span class="l3">Em minutos.</span></h1>
+        <p>Suba seus blocos — hook, story, CTA — e o varvid monta todas as combinações, cada arquivo com assinatura própria. Você baixa tudo pronto para postar.</p>
+        <div class="selos">
+          <span class="selo on">10 vídeos grátis</span>
+          <span class="selo">nada para instalar</span>
+          <span class="selo">cancele quando quiser</span>
+        </div>
+      </div>
+
+      <!-- o leque: o original na frente, as variações se afastando -->
+      <div class="leque" aria-hidden="true">
+        <div class="leque-in">
+          <div class="slot s6"><div class="carta" style="animation-delay:1.5s"><div class="tela t5"></div></div></div>
+          <div class="slot s5"><div class="carta" style="animation-delay:1.25s"><div class="tela t5"></div></div></div>
+          <div class="slot s4"><div class="carta" style="animation-delay:1s"><div class="tela t4"><span class="tag-v">v04</span></div></div></div>
+          <div class="slot s3"><div class="carta" style="animation-delay:.75s"><div class="tela t3"><span class="tag-v">v03</span></div></div></div>
+          <div class="slot s2"><div class="carta" style="animation-delay:.5s"><div class="tela t2"><span class="tag-v">v02</span></div></div></div>
+          <div class="slot s1"><div class="carta" style="animation-delay:.25s">
+            <div class="tela t1">
+              <div class="varredura"></div>
+              <div class="play"><span><svg viewBox="0 0 24 24" width="17" height="17" fill="#101318" style="margin-left:3px"><polygon points="6 4 20 12 6 20 6 4"/></svg></span></div>
+              <span class="tag-orig">original</span>
+            </div>
+          </div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── o acesso ───────────────────────────────────────────── -->
+    <div class="auth">
+      <div class="card">
+        <h2 id="title">Entrar na sua conta</h2>
+        <div class="sub" id="subtitle">Bem-vindo de volta — vamos criar.</div>
+
+        <div class="msg" id="msg"></div>
+
+        <div id="authForm">
+          <!-- Começa escondido de propósito: quem decide se aparece é o servidor
+               (googleEnabled). Se o JS falhar, ele fica escondido — o lado certo
+               de falhar, já que um botão que leva a erro é pior que botão nenhum. -->
+          <button class="gbtn" id="googleBtn" style="display:none">
+            <svg viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.6l6.7-6.7C35.6 2.4 30.1 0 24 0 14.6 0 6.4 5.4 2.5 13.3l7.8 6.1C12.2 13.7 17.6 9.5 24 9.5z"/><path fill="#4285F4" d="M46.1 24.6c0-1.6-.1-3.1-.4-4.6H24v9.1h12.4c-.5 2.9-2.1 5.3-4.6 7l7.1 5.5c4.2-3.9 6.6-9.6 6.6-16.4z"/><path fill="#FBBC05" d="M10.3 28.6c-.5-1.4-.8-3-.8-4.6s.3-3.2.8-4.6l-7.8-6.1C.9 16.3 0 20 0 24s.9 7.7 2.5 10.7l7.8-6.1z"/><path fill="#34A853" d="M24 48c6.1 0 11.3-2 15-5.5l-7.1-5.5c-2 1.3-4.5 2.1-7.9 2.1-6.4 0-11.8-4.2-13.7-9.9l-7.8 6.1C6.4 42.6 14.6 48 24 48z"/></svg>
+            Continuar com Google
+          </button>
+          <div class="divider" id="orDivider" style="display:none">ou com e-mail</div>
+          <div class="field" id="fieldEmail"><label for="email">E-mail</label><input type="email" id="email" placeholder="voce@email.com" autocomplete="email"></div>
+          <div class="field" id="fieldPassword"><label id="passwordLabel" for="password">Senha</label><input type="password" id="password" placeholder="••••••••" autocomplete="current-password"></div>
+          <div class="forgot" id="forgotRow"><a id="forgotLink">Esqueci minha senha</a></div>
+          <button class="submit" id="submitBtn">ENTRAR →</button>
+          <div class="swap" id="swap">Não tem conta? <a id="swapLink">Criar conta grátis</a></div>
+          <div class="swap" id="backRow" style="display:none"><a id="backLink">← Voltar para o login</a></div>
+        </div>
+      </div>
+
+      <div class="terms">Ao continuar, você concorda com os
+        <a href="/termos" target="_blank">Termos de Uso</a> e a
+        <a href="/privacidade" target="_blank">Política de Privacidade</a>.
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+let sb=null, cfg=null, modo='login';   // login · signup · reset · novaSenha
+const $=id=>document.getElementById(id);
+function showMsg(t,kind){const m=$('msg');m.className='msg show '+kind;m.textContent=t;}
+function hideMsg(){$('msg').className='msg';}
+function ver(id,v){const e=$(id); if(e) e.style.display = v?'':'none';}
+
+/* ── O QUE VEIO NA URL ────────────────────────────────────────────────────────
+   Precisa ser lido AGORA, antes de criar o client do Supabase: ao detectar a
+   sessão, a biblioteca consome o hash e limpa a barra de endereço. Se a gente
+   olhasse depois, não saberia mais que a pessoa chegou por um link de
+   recuperação — e ela cairia direto no app sem nunca trocar a senha.          */
+const URL_HASH  = location.hash || '';
+const URL_QUERY = location.search || '';
+
+function veioDeLinkDeRecuperacao(){
+  // Três sinais, de propósito. O "type=recovery" é o que o Supabase manda hoje
+  // no fluxo implícito; o "?recuperar=1" é nosso, colado no redirectTo, e vale
+  // em qualquer fluxo. Se um dia a biblioteca mudar o formato do link, o nosso
+  // sinal continua de pé — e essa é a diferença entre a recuperação quebrar
+  // silenciosamente e continuar funcionando.
+  return /type=recovery/.test(URL_HASH)
+      || /[?&]type=recovery/.test(URL_QUERY)
+      || /[?&]recuperar=1/.test(URL_QUERY);
+}
+function erroNoLink(){
+  const m = /error_description=([^&]+)/.exec(URL_HASH + URL_QUERY);
+  if(!m) return null;
+  try{ return decodeURIComponent(m[1].replace(/\+/g,' ')); }catch(_){ return m[1]; }
+}
+
+/* ── ERRO TÉCNICO → FRASE EM PORTUGUÊS ────────────────────────────────────────
+   O Supabase responde em inglês e com jargão. Mostrar isso na tela faz a pessoa
+   achar que quebrou alguma coisa. O texto original vai pro console, pra gente
+   conseguir depurar; a pessoa lê o que fazer a seguir.                        */
+const ERROS = {
+  'invalid login credentials'      : 'E-mail ou senha incorretos.',
+  'email not confirmed'            : 'Sua conta ainda não foi confirmada. Procure o e-mail de confirmação que enviamos.',
+  'user already registered'        : 'Já existe uma conta com esse e-mail. Tente entrar.',
+  'password should be at least'    : 'A senha precisa ter pelo menos 6 caracteres.',
+  'new password should be different': 'A nova senha precisa ser diferente da anterior.',
+  'email link is invalid or has expired': 'Esse link expirou. Peça um novo abaixo.',
+  'token has expired or is invalid': 'Esse link expirou. Peça um novo abaixo.',
+  'invalid or expired'             : 'Esse link expirou. Peça um novo abaixo.',
+  'for security purposes'          : 'Muitas tentativas seguidas. Espere um minuto e tente de novo.',
+  'email rate limit exceeded'      : 'Muitos e-mails enviados agora há pouco. Espere alguns minutos e tente de novo.',
+  'over_email_send_rate_limit'     : 'Muitos e-mails enviados agora há pouco. Espere alguns minutos e tente de novo.',
+  'unable to validate email'       : 'Esse e-mail não parece válido. Confira se está escrito certo.',
+  'failed to fetch'                : 'Não consegui falar com o servidor. Verifique sua conexão e tente de novo.',
+};
+function traduzir(msg){
+  const t = String(msg||'').toLowerCase();
+  for(const k in ERROS){ if(t.indexOf(k) !== -1) return ERROS[k]; }
+  console.error('[auth]', msg);
+  return 'Não consegui completar essa ação agora. Tente de novo em instantes.';
+}
+
+async function boot(){
+  cfg = await (await fetch('/auth-config.json')).json();
+  if(!cfg.authEnabled){
+    // Sem Supabase configurado → modo local, sem login
+    $('title').textContent='Modo local';
+    $('subtitle').textContent='O login ainda não foi configurado. Você pode usar o app normalmente.';
+    $('authForm').innerHTML='<button class="submit" id="enterLocal">ENTRAR NO APP →</button>'
+      +'<div class="msg show info" style="margin-top:16px">Pra ativar o login, adicione as chaves do Supabase no arquivo <b>supabase_config.json</b>.</div>';
+    document.getElementById('enterLocal').onclick=function(){location.href='/';};
+    return;
+  }
+  if(typeof supabase==='undefined'){
+    showMsg('Não consegui carregar a biblioteca de login. Verifique sua conexão com a internet e recarregue a página.','err');
+    return;
+  }
+  sb = supabase.createClient(cfg.url, cfg.anonKey);
+
+  // Alguns fluxos do Supabase só se anunciam por este evento. Registrar antes
+  // de qualquer coisa garante que não vamos perdê-lo.
+  sb.auth.onAuthStateChange(function(ev){ if(ev==='PASSWORD_RECOVERY') irPara('novaSenha'); });
+
+  ligarEventos();
+
+  // getSession() é o que faz a biblioteca processar o que veio na URL.
+  const {data:{session}} = await sb.auth.getSession();
+
+  // A ORDEM DAQUI PRA BAIXO É O CORAÇÃO DA RECUPERAÇÃO DE SENHA.
+  // Quem volta do link de recuperação chega COM sessão válida. Se a checagem
+  // "tem sessão? vai pro app" viesse primeiro, essa pessoa seria jogada direto
+  // lá dentro e nunca veria a tela de definir a nova senha — o link viraria um
+  // "entrar sem senha", e quem esqueceu continuaria sem conseguir trocar.
+  const problema = erroNoLink();
+  if(problema){ irPara('reset'); showMsg(traduzir(problema),'err'); return; }
+  if(veioDeLinkDeRecuperacao()){ irPara('novaSenha'); return; }
+  if(session){ location.href='/'; return; }   // já logado, uso normal
+  irPara('login');
+}
+
+function ligarEventos(){
+  $('googleBtn').onclick = async ()=>{
+    hideMsg();
+    const {error} = await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:location.origin}});
+    if(error) showMsg(traduzir(error.message),'err');
+  };
+  $('submitBtn').onclick = doSubmit;
+  $('swapLink').onclick  = ()=>irPara(modo==='signup'?'login':'signup');
+  $('forgotLink').onclick= ()=>irPara('reset');
+  $('backLink').onclick  = ()=>irPara('login');
+  [$('email'),$('password')].forEach(el=>el.addEventListener('keydown',e=>{if(e.key==='Enter')doSubmit();}));
+}
+
+/* ── UMA TELA, QUATRO ESTADOS ─────────────────────────────────────────────────
+   Em vez de quatro páginas (quatro lugares pra esquecer de corrigir um texto),
+   a mesma tela mostra só o que faz sentido em cada momento.                   */
+const TELAS = {
+  login:     {titulo:'Entrar na sua conta',   sub:'Bem-vindo de volta — vamos criar.',
+              botao:'ENTRAR →',           email:true,  senha:true,  esqueci:true,  trocar:true,  voltar:false},
+  signup:    {titulo:'Criar sua conta',       sub:'Comece a gerar variações agora.',
+              botao:'CRIAR CONTA →',      email:true,  senha:true,  esqueci:false, trocar:true,  voltar:false},
+  reset:     {titulo:'Recuperar senha',       sub:'Diga seu e-mail que eu mando um link pra você criar uma senha nova.',
+              botao:'ENVIAR LINK →',      email:true,  senha:false, esqueci:false, trocar:false, voltar:true},
+  novaSenha: {titulo:'Criar uma senha nova',  sub:'Link confirmado. Escolha a senha que você vai usar de agora em diante.',
+              botao:'SALVAR SENHA →',     email:false, senha:true,  esqueci:false, trocar:false, voltar:false},
+};
+
+function irPara(novo){
+  modo = novo; hideMsg();
+  const t = TELAS[modo];
+  $('title').textContent    = t.titulo;
+  $('subtitle').textContent = t.sub;
+  $('submitBtn').textContent= t.botao;
+  ver('fieldEmail',    t.email);
+  ver('fieldPassword', t.senha);
+  ver('forgotRow',     t.esqueci);
+  ver('swap',          t.trocar);
+  ver('backRow',       t.voltar);
+  // O botão do Google só existe onde faz sentido — e só se o provider estiver
+  // realmente ligado no servidor. Enquanto não estiver, ele levaria a pessoa a
+  // um erro do Google, que parece culpa dela. Melhor nem aparecer.
+  const mostrarGoogle = !!(cfg && cfg.googleEnabled) && (modo==='login' || modo==='signup');
+  ver('googleBtn', mostrarGoogle);
+  ver('orDivider', mostrarGoogle);
+  $('passwordLabel').textContent = (modo==='novaSenha') ? 'Nova senha' : 'Senha';
+  $('password').setAttribute('autocomplete', modo==='login' ? 'current-password' : 'new-password');
+  if(modo==='signup') $('swap').innerHTML = 'Já tem conta? <a id="swapLink">Entrar</a>';
+  if(modo==='login')  $('swap').innerHTML = 'Não tem conta? <a id="swapLink">Criar conta grátis</a>';
+  const sl=$('swapLink'); if(sl) sl.onclick = ()=>irPara(modo==='signup'?'login':'signup');
+}
+
+async function doSubmit(){
+  hideMsg();
+  const email=$('email').value.trim(), password=$('password').value;
+
+  if(modo!=='novaSenha' && !email){ showMsg('Preencha seu e-mail.','err'); return; }
+  if(modo!=='reset' && !password){ showMsg('Preencha a senha.','err'); return; }
+  if((modo==='signup'||modo==='novaSenha') && password.length<6){
+    showMsg('A senha precisa ter pelo menos 6 caracteres.','err'); return;
+  }
+
+  $('submitBtn').disabled=true;
+  try{
+    if(modo==='signup'){
+      const {data,error}=await sb.auth.signUp({email,password});
+      if(error){showMsg(traduzir(error.message),'err');return;}
+      if(data.session){ location.href='/'; }
+      else showMsg('Conta criada! Confira seu e-mail pra confirmar o cadastro.','ok');
+
+    }else if(modo==='login'){
+      const {error}=await sb.auth.signInWithPassword({email,password});
+      if(error){showMsg(traduzir(error.message),'err');return;}
+      location.href='/';
+
+    }else if(modo==='reset'){
+      // redirectTo precisa ser ESTA página: é aqui que a tela de nova senha
+      // mora. Se apontasse pra raiz, a pessoa cairia no app com sessão aberta
+      // e sem nunca trocar a senha.
+      const {error}=await sb.auth.resetPasswordForEmail(email,{redirectTo:location.origin+'/login?recuperar=1'});
+      if(error){showMsg(traduzir(error.message),'err');return;}
+      // Resposta igual existindo a conta ou não: dizer "esse e-mail não tem
+      // cadastro" entregaria a estranhos quem é cliente.
+      showMsg('Se existir uma conta com esse e-mail, o link está a caminho. Ele vale por 1 hora — confira também o spam.','ok');
+
+    }else if(modo==='novaSenha'){
+      const {error}=await sb.auth.updateUser({password});
+      if(error){
+        showMsg(traduzir(error.message),'err');
+        // Link já usado ou vencido: não adianta insistir nesta tela.
+        if(String(error.message||'').toLowerCase().indexOf('expired')!==-1) irPara('reset');
+        return;
+      }
+      showMsg('Senha alterada. Entrando…','ok');
+      setTimeout(()=>{ location.href='/'; }, 900);
+    }
+  }catch(e){
+    // Sem isto, qualquer falha de rede deixaria a tela muda e o botão travado.
+    showMsg(traduzir(e && e.message), 'err');
+  }finally{ $('submitBtn').disabled=false; }
+}
+boot();
+</script>
+</body></html>

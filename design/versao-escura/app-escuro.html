@@ -1,0 +1,1350 @@
+<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>varvid · estúdio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ─────────────────────────────────────────────────────────────────────────────
+   varvid · estúdio — paleta Noite
+   O preto continua sendo o fundo, mas nada é caixa preta sobre preto: as áreas
+   de apoio são placas que começam um degrau acima e dissolvem no fundo, então
+   o texto sempre pousa em alguma coisa em vez de flutuar.
+   Trilha no topo com o saldo em evidência; à esquerda o apoio (modo, guia,
+   headline, estrutura) e no centro o trabalho — soltar arquivos, escolher
+   quantos e gerar, nessa ordem, numa coluna só.
+   O amarelo marca a ação primária e um número por bloco. Nada além disso.
+   ───────────────────────────────────────────────────────────────────────────── */
+:root{
+  --grafite:#101318; --amarelo:#FFC700; --amarelo2:#FFD336;
+  --bg:#0B0E12; --bg2:#101419; --bg3:#151A20; --campo:#0F1318;
+  --linha:#212932; --linha2:#1A2028; --linha3:#2A3540;
+  --t1:#FFFFFF; --t2:#C6CDD6; --t3:#98A1AC; --t4:#6C7681; --t5:#4B545E;
+  --am-sua:rgba(255,199,0,.10); --am-bor:rgba(255,199,0,.28); --am-texto:#C9A93A;
+  --err:#FF8A7A; --ok:#5FD39B;
+  --placa:linear-gradient(180deg,var(--bg3) 0%,rgba(11,14,18,0) 100%);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:var(--bg);color:var(--t1);
+  font-family:'Poppins',system-ui,-apple-system,'Segoe UI',sans-serif;font-size:14px;
+  -webkit-font-smoothing:antialiased;opacity:0;transition:opacity .2s}
+body.ready{opacity:1}
+button{font-family:inherit}
+
+.gate{position:fixed;inset:0;display:grid;place-items:center;background:var(--bg);z-index:50}
+.gate .sp{width:26px;height:26px;border:3px solid var(--linha);border-top-color:var(--amarelo);
+  border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── esqueleto ───────────────────────────────────────────────────────────── */
+.app{display:flex;flex-direction:column;height:100vh}
+.corpo{flex:1;min-height:0;display:grid;grid-template-columns:340px 1fr}
+
+/* ── trilha do topo ──────────────────────────────────────────────────────── */
+.topo{height:58px;flex-shrink:0;background:var(--bg2);border-bottom:1px solid var(--linha);
+  display:flex;align-items:center;justify-content:space-between;padding:0 20px;gap:16px}
+.marca{display:flex;align-items:center;gap:10px;min-width:0}
+.marca .nm{font-size:17px;font-weight:700;letter-spacing:-.022em;color:var(--t1)}
+.marca .ver{font-family:ui-monospace,monospace;font-size:10px;color:var(--t4);background:var(--bg3);
+  border:1px solid var(--linha);border-radius:999px;padding:3px 9px;margin-left:2px}
+.user{display:none;align-items:center;gap:12px;min-width:0}
+/* O saldo é o número que decide se a pessoa pode trabalhar hoje: ele é a única
+   pastilha cheia de amarelo da tela, e não some no meio dos outros controles. */
+.user .credits{display:none;align-items:baseline;gap:6px;font-size:14.5px;font-weight:700;
+  letter-spacing:-.02em;color:var(--grafite);background:var(--amarelo);border:1px solid var(--amarelo);
+  border-radius:999px;padding:7px 15px;white-space:nowrap}
+.user .credits.baixo{background:transparent;border-color:var(--am-bor);color:var(--amarelo);
+  box-shadow:0 0 0 3px rgba(255,199,0,.07)}
+.user .em{font-size:12.5px;color:var(--t4);max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.user .planos-btn{display:none;align-items:center;font-size:12.5px;font-weight:500;color:var(--t2);
+  background:transparent;border:1px solid var(--linha);border-radius:9px;padding:8px 14px;cursor:pointer}
+.user .planos-btn:hover{border-color:var(--linha3);color:var(--t1)}
+.user .out{font-size:12.5px;color:var(--t4);background:none;border:none;cursor:pointer;padding:8px 4px}
+.user .out:hover{color:var(--t2)}
+
+/* ── coluna de apoio ─────────────────────────────────────────────────────── */
+.rail{border-right:1px solid var(--linha);display:flex;flex-direction:column;min-height:0;min-width:0}
+.rail-abas{padding:16px 16px 0;flex-shrink:0}
+.rail-rolagem{flex:1;min-height:0;overflow-y:auto}
+.rail-pe{flex-shrink:0;border-top:1px solid var(--linha2);padding:14px 16px;
+  display:flex;flex-direction:column;gap:5px}
+.rail-pe .rot{font-size:11.5px;font-weight:500;color:var(--t3)}
+.rail-pe .nota{font-size:11px;color:var(--t5);line-height:1.5}
+
+.mode-tabs{display:flex;gap:5px;background:var(--bg2);border:1px solid var(--linha);
+  border-radius:11px;padding:5px}
+.mtab{flex:1;height:40px;display:flex;align-items:center;justify-content:center;gap:7px;
+  font-size:12.5px;font-weight:500;color:var(--t3);background:transparent;border:none;
+  border-radius:8px;cursor:pointer}
+.mtab svg{width:14px;height:14px}
+.mtab:hover{color:var(--t1)}
+.mtab.active{background:var(--amarelo);color:var(--grafite);font-weight:600}
+.mtab.active svg{stroke:var(--grafite)}
+
+/* Blocos do apoio: sem caixa, só uma linha embaixo separando. O JS liga e
+   desliga alguns com display:block, então o espaçamento não pode depender de
+   gap de flex — daí o margin entre irmãos. */
+.bloco{padding:16px;border-bottom:1px solid var(--linha2)}
+.bloco>*+*{margin-top:12px}
+.bloco-hdr{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.rlabel,.sec-label{font-size:10.5px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--t4)}
+.opt{font-size:10.5px;color:var(--t5)}
+
+/* guia de nomes — a placa amarela dissolve; é por onde a pessoa começa */
+.guia{padding:16px;border-bottom:1px solid var(--linha2);
+  background:linear-gradient(180deg,var(--am-sua) 0%,rgba(11,14,18,0) 78%)}
+.guia>*+*{margin-top:13px}
+.guia-hdr{display:flex;align-items:center;gap:11px;cursor:pointer;user-select:none}
+.guia-ic{width:28px;height:28px;border-radius:9px;background:var(--amarelo);display:grid;place-items:center;flex-shrink:0}
+.guia-tit{display:block;font-size:13px;font-weight:600;color:var(--t1)}
+.guia-sub{display:block;font-size:11px;color:var(--amarelo);opacity:.8;margin-top:1px}
+.chev{width:15px;height:15px;color:var(--t4);margin-left:auto;transition:transform .2s;flex-shrink:0}
+.guia-hdr.open .chev{transform:rotate(180deg)}
+.collapse-body{display:none}
+.collapse-body.open{display:flex;flex-direction:column;gap:13px}
+.grp{display:flex;flex-direction:column;gap:8px}
+.grp-h{display:flex;align-items:baseline;gap:8px}
+.grp-name{font-size:12px;font-weight:600;color:var(--t2)}
+.grp-sub{font-size:10.5px;color:var(--t5)}
+.ng-row{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.ng-name{display:block;font-size:12.5px;font-weight:500;color:var(--t1)}
+.ng-desc{display:block;font-size:10.5px;color:var(--t4);margin-top:1px}
+.ng-file{font-family:ui-monospace,monospace;font-size:11px;color:var(--t2);background:var(--bg);
+  border:1px solid var(--linha);border-radius:6px;padding:4px 8px;flex-shrink:0}
+.ng-tip,.grp-note{font-size:11px;line-height:1.55;color:var(--t3);
+  border-top:1px solid var(--linha2);padding-top:11px}
+.ng-tip{display:flex;gap:9px;align-items:flex-start}
+.ng-tip svg{width:15px;height:15px;color:var(--t4);flex-shrink:0;margin-top:1px}
+.ng-tip code,.grp-note code{font-family:ui-monospace,monospace;font-size:11px;color:var(--amarelo)}
+
+/* headline, na coluna de apoio */
+.hl-col{display:flex;flex-direction:column;gap:8px}
+.hl-ta{min-height:62px;background:var(--bg3);border:1px solid var(--linha);border-radius:10px;
+  padding:11px 12px;font-family:inherit;font-size:12.5px;line-height:1.45;color:var(--t1);
+  resize:none;outline:none}
+.hl-ta:focus{border-color:var(--amarelo)}
+.hl-ta::placeholder{color:var(--t4)}
+.hl-dur{display:flex;align-items:center;justify-content:space-between;gap:10px;
+  background:var(--bg3);border:1px solid var(--linha);border-radius:10px;padding:7px 12px}
+.hl-dur .lb{font-size:11.5px;color:var(--t3)}
+.hl-dur .box{display:flex;align-items:baseline;gap:5px}
+.hl-dur input{width:46px;background:none;border:none;outline:none;text-align:right;
+  font-family:inherit;font-size:18px;font-weight:700;color:var(--amarelo);-moz-appearance:textfield}
+.hl-dur input::-webkit-outer-spin-button,.hl-dur input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.hl-dur .u{font-size:11px;color:var(--t4)}
+.nota-sec{font-size:11px;line-height:1.55;color:var(--t4)}
+
+/* estrutura detectada */
+.mx-card-label{font-size:11.5px;font-weight:500;color:var(--t3);margin-bottom:7px}
+.mx-row{display:flex;align-items:center;justify-content:space-between;gap:10px;
+  border-radius:9px;padding:9px 11px;margin-bottom:6px;border:1px solid var(--linha2)}
+.mx-row.on{background:var(--am-sua);border-color:var(--am-bor)}
+.mx-row.soon{background:rgba(255,255,255,.02)}
+.mx-rname{font-size:12.5px;font-weight:500;color:var(--t1)}
+/* O script marca os blocos fixos com color:#888 inline — no escuro isso some. */
+.mx-row.soon .mx-rname[style]{color:var(--t3)!important}
+.mx-rsub{font-size:10.5px;color:var(--t4);margin-top:1px}
+.mx-tag{font-family:ui-monospace,monospace;font-size:10px;color:var(--t3);background:var(--bg3);
+  border:1px solid var(--linha);border-radius:5px;padding:3px 7px}
+.mx-tag.acc{background:var(--amarelo);border-color:var(--amarelo);color:var(--grafite);font-weight:600}
+#vary-blocks div[style],#fixed-blocks div[style]{color:var(--t4)!important}
+.combo-bar{border-top:1px solid var(--linha2);padding-top:13px;display:flex;align-items:flex-end;gap:12px}
+.combo-num{font-size:30px;font-weight:700;letter-spacing:-.03em;line-height:1;color:var(--amarelo)}
+.combo-label{font-size:11.5px;color:var(--t3);margin-top:3px}
+.combo-formula{font-family:ui-monospace,monospace;font-size:10.5px;color:var(--t5);padding-bottom:3px}
+.combo-disc{font-size:11px;line-height:1.55;color:var(--t4)}
+
+/* ── palco: a coluna de leitura, onde o trabalho acontece ────────────────── */
+.palco{min-width:0;min-height:0;overflow-y:auto;display:flex;justify-content:center;padding:30px 24px 40px}
+.palco-in{width:100%;max-width:700px;display:flex;flex-direction:column;gap:18px}
+.palco-cab{display:flex;flex-direction:column;gap:5px}
+.palco-cab h1{font-size:28px;font-weight:700;letter-spacing:-.032em;line-height:1.12;color:var(--t1)}
+.palco-cab span{font-size:13.5px;line-height:1.55;color:var(--t3)}
+
+.sec-label-row{display:flex;align-items:center;justify-content:space-between;gap:12px}
+
+/* o balão: é o herói da tela, e por isso é grande */
+.drop{position:relative;min-height:250px;border:1px dashed var(--linha3);border-radius:14px;
+  background:linear-gradient(180deg,var(--bg3) 0%,rgba(11,14,18,0) 100%);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:34px 20px;text-align:center;cursor:pointer}
+.drop.over{border-color:var(--amarelo);
+  background:linear-gradient(180deg,rgba(255,199,0,.13) 0%,rgba(11,14,18,0) 100%)}
+.drop.locked{opacity:.5;cursor:not-allowed;border-style:solid}
+.drop.locked input{pointer-events:none}
+.drop input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.drop-ic{width:54px;height:54px;border-radius:15px;background:var(--amarelo);
+  display:grid;place-items:center;margin:0 auto 14px}
+.drop-main{font-size:16px;font-weight:600;color:var(--t1)}
+.drop-sub{font-size:13px;color:var(--t3);margin-top:4px}
+.drop-fmt{font-family:ui-monospace,monospace;font-size:10.5px;color:var(--t5);margin-top:12px}
+.badge{display:none;margin-top:13px;font-family:ui-monospace,monospace;font-size:11px;color:var(--grafite);
+  background:var(--amarelo);border:1px solid var(--amarelo);border-radius:7px;padding:6px 11px;font-weight:600}
+.badge.show{display:inline-flex;align-items:center;gap:7px}
+.spin{width:11px;height:11px;border:2px solid rgba(16,19,24,.25);border-top-color:var(--grafite);
+  border-radius:50%;animation:spin .8s linear infinite;display:inline-block}
+
+/* quantas variações — logo abaixo do balão, antes do botão */
+.caixa{background:var(--bg2);border:1px solid var(--linha);border-radius:12px;padding:16px;
+  display:flex;flex-direction:column;gap:12px}
+.var-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px}
+.var-btn{height:42px;border:1px solid var(--linha);background:var(--bg3);border-radius:9px;
+  font-size:13.5px;font-weight:600;color:var(--t3);cursor:pointer}
+.var-btn:hover{border-color:var(--linha3);color:var(--t1)}
+.var-btn.active{background:var(--amarelo);border-color:var(--amarelo);color:var(--grafite);font-weight:700}
+.nota-inline{font-size:11.5px;color:var(--t4)}
+
+/* ── gerar ───────────────────────────────────────────────────────────────── */
+.gen-wrap{display:flex;flex-direction:column;gap:11px}
+/* O aviso de saldo mora colado no botão: é ali que a pessoa descobre que não
+   dá pra seguir, e é ali que precisa estar o caminho de volta. */
+.saldo-aviso{display:none}
+.saldo-aviso.show{display:block;position:relative;overflow:hidden;
+  border:1px solid var(--am-bor);border-radius:12px;padding:16px 170px 16px 18px;
+  background:linear-gradient(140deg,rgba(255,199,0,.14) 0%,rgba(11,14,18,0) 68%);
+  font-size:12.5px;line-height:1.55;color:var(--t3)}
+.saldo-aviso b{display:block;font-size:14.5px;font-weight:600;color:var(--amarelo);margin-bottom:2px}
+.saldo-aviso a{position:absolute;right:18px;top:50%;transform:translateY(-50%);
+  font-size:13.5px;font-weight:600;color:var(--grafite);background:var(--amarelo);
+  border-radius:9px;padding:11px 18px;cursor:pointer;text-decoration:none;white-space:nowrap}
+.gen-row{display:flex;align-items:center;gap:10px}
+.btn-gen{flex:1;height:52px;border:none;border-radius:11px;cursor:pointer;
+  background:linear-gradient(180deg,var(--amarelo) 0%,var(--amarelo2) 100%);
+  color:var(--grafite);font-size:15.5px;font-weight:600;letter-spacing:.005em}
+.btn-gen:hover{filter:brightness(1.04)}
+.btn-gen:disabled{background:var(--bg3);border:1px solid var(--linha);color:var(--t5);cursor:not-allowed;filter:none}
+.btn-ghost{font-size:13px;font-weight:500;color:var(--t3);background:transparent;
+  border:1px solid var(--linha);border-radius:9px;padding:9px 15px;cursor:pointer}
+.btn-ghost:hover{color:var(--t1);border-color:var(--linha3)}
+.btn-clear-all{height:52px;padding:0 20px;border-radius:11px}
+.dur-line{display:none;font-size:12px;line-height:1.5;padding:0 2px}
+.dur-line.show{display:block}
+.dur-line.ok{color:var(--ok)}
+.dur-line.over{color:var(--amarelo)}
+.dur-line .sub{display:block;color:var(--t4);margin-top:2px}
+
+/* ── progresso e resultados ──────────────────────────────────────────────── */
+.prog{display:none;border:1px solid var(--am-bor);border-radius:12px;padding:18px;
+  background:linear-gradient(180deg,rgba(255,199,0,.09) 0%,rgba(11,14,18,0) 82%)}
+.prog.show{display:block}
+.prog-top{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:11px}
+.prog-label{font-size:13.5px;font-weight:600;color:var(--t1)}
+.prog-frac{font-family:ui-monospace,monospace;font-size:13px;color:var(--t3)}
+.track{height:6px;border-radius:3px;background:var(--linha);overflow:hidden}
+.fill{height:100%;width:0;background:linear-gradient(90deg,var(--amarelo) 0%,var(--amarelo2) 100%);transition:width .4s}
+
+.results{display:none;background:var(--bg2);border:1px solid var(--linha);border-radius:12px;padding:18px}
+.results.show{display:flex;flex-direction:column;gap:14px}
+.results-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.results-count{font-size:15px;font-weight:600;color:var(--t1)}
+.btn-all{font-size:13px;font-weight:600;color:var(--grafite);background:var(--amarelo);border:none;
+  border-radius:9px;padding:10px 17px;cursor:pointer}
+.btn-all:hover{filter:brightness(1.06)}
+.results-warn{font-size:11.5px;line-height:1.55;color:var(--t4);background:rgba(255,255,255,.02);
+  border:1px solid var(--linha2);border-radius:9px;padding:10px 12px}
+.results-warn b{font-weight:600;color:var(--t2)}
+.res-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:9px}
+.res{display:flex;align-items:center;gap:10px;background:var(--bg3);border:1px solid var(--linha);
+  border-radius:9px;padding:10px 12px}
+.res .n{flex:1;font-size:12.5px;font-weight:500;color:var(--t2)}
+.res .b{font-size:13px;color:var(--grafite);background:var(--amarelo);border:none;
+  border-radius:7px;padding:5px 10px;cursor:pointer;line-height:1}
+.res .b:hover{filter:brightness(1.06)}
+
+/* os quatro passos, discretos: lembram a ordem sem competir com o balão */
+.empty{display:none;align-items:center;justify-content:center;gap:22px;flex-wrap:wrap;
+  border-top:1px solid var(--linha2);padding:16px 4px 0}
+.empty-tx{font-size:11.5px;color:var(--t5);line-height:2;text-align:center}
+.empty-tx b{font-family:ui-monospace,monospace;font-weight:400;color:var(--amarelo);opacity:.7}
+
+/* ── planos ──────────────────────────────────────────────────────────────── */
+.modal-bg{position:fixed;inset:0;background:rgba(5,7,10,.82);display:none;
+  align-items:center;justify-content:center;z-index:80;padding:20px}
+.modal-bg.show{display:flex}
+.modal{background:#0F1318;border:1px solid var(--linha);border-radius:18px;width:100%;max-width:860px;
+  max-height:90vh;overflow-y:auto;box-shadow:0 30px 80px rgba(0,0,0,.6)}
+.modal-topo{background:linear-gradient(180deg,#1A212A 0%,rgba(15,19,24,0) 100%);padding:26px 30px 30px;
+  display:flex;align-items:flex-start;justify-content:space-between;gap:18px;flex-wrap:wrap}
+.modal-title{font-size:24px;font-weight:700;letter-spacing:-.03em;color:var(--t1)}
+.modal-sub{font-size:13px;color:var(--t3);margin-top:4px}
+.modal-x{width:32px;height:32px;border-radius:9px;background:transparent;border:1px solid var(--linha);
+  color:var(--t3);cursor:pointer;font-size:13px;flex-shrink:0}
+.modal-x:hover{border-color:var(--linha3);color:var(--t1)}
+.modal-corpo{padding:0 30px 26px;display:flex;flex-direction:column;gap:20px}
+.ciclo-sw{display:none;align-self:flex-start;background:rgba(11,14,18,.6);border:1px solid var(--linha);
+  border-radius:10px;padding:3px;gap:3px}
+.ciclo-sw[style*="inline-flex"],.ciclo-sw[style*="flex"]{display:inline-flex}
+.ciclo-btn{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:500;color:var(--t3);
+  background:none;border:none;border-radius:7px;padding:8px 15px;cursor:pointer}
+.ciclo-btn.on{background:#1A212A;border:1px solid #2A3540;color:var(--t1);font-weight:600}
+.ciclo-off{font-family:ui-monospace,monospace;font-size:9.5px;background:var(--amarelo);
+  color:var(--grafite);border-radius:4px;padding:2px 5px}
+.plan-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px}
+/* O plano vigente é marcado por um fade, não por um bloco cheio: ele se
+   destaca sem pesar mais que os outros dois. */
+.plan-card{border:1px solid var(--linha);border-radius:14px;padding:22px;
+  display:flex;flex-direction:column;gap:14px}
+.plan-card.current{border-color:var(--am-bor);
+  background:linear-gradient(170deg,rgba(255,199,0,.13) 0%,rgba(15,19,24,0) 62%)}
+.plan-name{display:flex;align-items:center;gap:8px;font-size:15px;font-weight:600;
+  letter-spacing:-.02em;color:var(--t1)}
+.plan-card.current .plan-name{color:var(--amarelo)}
+.plan-tag{font-family:ui-monospace,monospace;font-size:9.5px;font-weight:500;color:var(--grafite);
+  background:var(--amarelo);border-radius:4px;padding:3px 6px}
+.plan-price{font-size:30px;font-weight:700;letter-spacing:-.035em;line-height:1;color:var(--t1)}
+.plan-per{font-size:11.5px;color:var(--t4)}
+.plan-credits{font-size:12.5px;color:var(--t3);flex:1}
+.plan-credits b{font-weight:700;font-size:16px;color:var(--t1)}
+.plan-btn{height:44px;border:none;border-radius:9px;cursor:pointer;font-size:13.5px;font-weight:600;
+  color:var(--grafite);background:linear-gradient(180deg,var(--amarelo) 0%,var(--amarelo2) 100%)}
+.plan-btn:hover{filter:brightness(1.04)}
+.plan-btn:disabled{background:rgba(11,14,18,.5);border:1px solid var(--linha);color:var(--t4);
+  cursor:default;filter:none}
+.plan-vale{display:flex;align-items:center;gap:26px;flex-wrap:wrap;
+  border-top:1px solid var(--linha2);padding-top:18px}
+.plan-vale div{display:flex;align-items:center;gap:9px;font-size:12.5px;color:var(--t3)}
+.modal-note{font-size:11.5px;line-height:1.8;color:var(--t4);text-align:center}
+.modal-note a{color:var(--t3);cursor:pointer;text-decoration:none}
+.modal-note a:hover{color:var(--amarelo)}
+
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:90;display:none;
+  background:#1A212A;border:1px solid var(--linha3);color:var(--t1);font-size:12.5px;line-height:1.5;
+  padding:12px 18px;border-radius:10px;cursor:pointer;max-width:min(90vw,520px);
+  box-shadow:0 14px 34px rgba(0,0,0,.5)}
+.toast.show{display:block}
+.toast.err{background:#2A1512;border-color:#5A2A22;color:#FFD5CE}
+
+/* ── telas menores ───────────────────────────────────────────────────────── */
+@media (max-width:1180px){
+  .corpo{grid-template-columns:304px 1fr}
+  .palco{padding:24px 20px 36px}
+}
+@media (max-width:900px){
+  html,body{height:auto}
+  .app{height:auto}
+  .corpo{grid-template-columns:1fr}
+  .rail{border-right:none;border-bottom:1px solid var(--linha)}
+  .rail-rolagem{overflow:visible}
+  .rail-pe{display:none}
+  .palco{overflow:visible;padding:20px 16px 32px}
+  .topo{height:auto;padding:12px 16px;flex-wrap:wrap;gap:10px}
+  .user{flex-wrap:wrap;gap:9px}
+  .user .em{max-width:160px}
+  .palco-cab h1{font-size:23px}
+  .var-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+@media (max-width:420px){
+  .marca .ver{display:none}
+  .gen-row{flex-direction:column;align-items:stretch}
+  .btn-clear-all{width:100%}
+  .saldo-aviso.show{padding:16px 18px}
+  .saldo-aviso a{position:static;transform:none;display:block;margin-top:13px;text-align:center}
+  .drop{min-height:210px}
+}
+</style></head>
+<body>
+<div class="gate" id="gate"><div class="sp"></div></div>
+
+<div class="app">
+
+  <!-- ══════════════════════════════════════════════ topo ══ -->
+  <div class="topo">
+    <div class="marca">
+      <svg viewBox="0 0 22 22" width="22" height="22" fill="none" aria-hidden="true"><rect x="1" y="6" width="4" height="10" rx="2" fill="#FFFFFF"/><rect x="7" y="2" width="4" height="18" rx="2" fill="#FFFFFF"/><rect x="13" y="5" width="4" height="12" rx="2" fill="#FFC700"/><rect x="19" y="8" width="3" height="6" rx="1.5" fill="#FFFFFF" opacity=".3"/></svg>
+      <span class="nm">varvid</span>
+      <span class="ver">estúdio</span>
+    </div>
+    <div class="user" id="userWrap">
+      <span class="credits" id="creditsPill" style="display:none">—</span>
+      <button class="planos-btn" id="planosBtn" style="display:none" onclick="openPlans()">Planos</button>
+      <span class="em" id="userEmail"></span>
+      <button class="out" onclick="logout()">Sair</button>
+    </div>
+  </div>
+
+  <div class="corpo">
+
+    <!-- ══════════════════════════════════════════ apoio ══ -->
+    <aside class="rail">
+
+      <div class="rail-abas">
+        <div class="mode-tabs">
+          <button class="mtab active" id="tab-remix" onclick="setMode('remix')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>Remix de takes</button>
+          <button class="mtab" id="tab-single" onclick="setMode('single')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>Vídeo único</button>
+        </div>
+      </div>
+
+      <div class="rail-rolagem">
+
+        <!-- REMIX: guia de nomes -->
+        <div class="guia" id="naming-sec">
+          <div class="guia-hdr open" id="naming-hdr" onclick="toggleGuia('naming')">
+            <span class="guia-ic"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#101318" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg></span>
+            <span><span class="guia-tit">Como nomear os arquivos</span><span class="guia-sub">comece por aqui — o nome diz o que é cada take</span></span>
+            <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+          </div>
+          <div class="collapse-body open" id="naming-body">
+            <div class="grp">
+              <div class="grp-h"><span class="grp-name">Remixam entre si</span><span class="grp-sub">giram para gerar variações</span></div>
+              <div class="ng-row"><span><span class="ng-name">Hook</span><span class="ng-desc">o gancho que prende</span></span><span class="ng-file">Hook1.mp4</span></div>
+              <div class="ng-row"><span><span class="ng-name">CTA</span><span class="ng-desc">a chamada pra agir</span></span><span class="ng-file">CTA1.mp4</span></div>
+            </div>
+            <div class="grp">
+              <div class="grp-h"><span class="grp-name">Ficam iguais</span><span class="grp-sub">repetem em todos</span></div>
+              <div class="ng-row"><span><span class="ng-name">Story</span><span class="ng-desc">a história / contexto</span></span><span class="ng-file">Story.mp4</span></div>
+              <div class="ng-row"><span><span class="ng-name">Revelação</span><span class="ng-desc">a virada</span></span><span class="ng-file">Revelacao.mp4</span></div>
+              <div class="ng-row"><span><span class="ng-name">Prova</span><span class="ng-desc">resultado / prova social</span></span><span class="ng-file">Prova.mp4</span></div>
+            </div>
+            <div class="grp-note">Numere para multiplicar as versões: <code>Hook1</code>, <code>Hook2</code>. Bloco muito longo quebra em <code>_pt1</code>, <code>_pt2</code> — ele junta na ordem certa.</div>
+          </div>
+        </div>
+
+        <!-- VÍDEO ÚNICO: guia de uso -->
+        <div class="guia" id="single-sec" style="display:none">
+          <div class="guia-hdr open" id="single-hdr" onclick="toggleGuia('single')">
+            <span class="guia-ic"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#101318" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg></span>
+            <span><span class="guia-tit">Como funciona o vídeo único</span><span class="guia-sub">um arquivo pronto, várias cópias distintas</span></span>
+            <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+          </div>
+          <div class="collapse-body open" id="single-body">
+            <div class="grp">
+              <div class="grp-h"><span class="grp-name">O que entra</span><span class="grp-sub">um arquivo por vez</span></div>
+              <div class="ng-row"><span><span class="ng-name">Formato</span><span class="ng-desc">o que sai de qualquer celular</span></span><span class="ng-file">.mp4 · .mov</span></div>
+              <div class="ng-row"><span><span class="ng-name">Duração</span><span class="ng-desc">mais longo é recusado antes do envio</span></span><span class="ng-file">até 1min30</span></div>
+            </div>
+            <div class="grp">
+              <div class="grp-h"><span class="grp-name">Qual modo usar</span><span class="grp-sub">a confusão mais comum</span></div>
+              <div class="ng-row"><span><span class="ng-name">Tenho o vídeo pronto</span><span class="ng-desc">quero várias versões dele</span></span><span class="ng-file">Vídeo único</span></div>
+              <div class="ng-row"><span><span class="ng-name">Tenho takes separados</span><span class="ng-desc">quero que ele monte</span></span><span class="ng-file">Remix de takes</span></div>
+            </div>
+            <div class="ng-tip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><span>O headline é escrito por cima do vídeo, com um estilo diferente em cada variação. Deixe em branco se o seu vídeo já tem texto.</span></div>
+          </div>
+        </div>
+
+        <!-- headline -->
+        <div class="bloco">
+          <div class="bloco-hdr"><span class="rlabel">Headline no vídeo</span><span class="opt">opcional</span></div>
+          <div class="hl-col">
+            <textarea class="hl-ta" id="hl" maxlength="80" placeholder="Texto do headline… (vazio = sem texto)"></textarea>
+            <div class="hl-dur">
+              <span class="lb">Aparece por</span>
+              <span class="box"><input type="number" id="hd" value="3" min="1" max="15"><span class="u">seg</span></span>
+            </div>
+          </div>
+          <div class="nota-sec">Escrito por cima do vídeo, com estilo diferente em cada variação.</div>
+        </div>
+
+        <!-- REMIX: estrutura detectada -->
+        <div class="bloco" id="remix-right" style="display:none">
+          <span class="rlabel">Estrutura detectada</span>
+          <div>
+            <div class="mx-card-label">Remixam entre si</div>
+            <div id="vary-blocks"><div style="font-size:11.5px;padding:6px 0">envie os takes…</div></div>
+          </div>
+          <div>
+            <div class="mx-card-label">Ficam iguais</div>
+            <div id="fixed-blocks"><div style="font-size:11.5px;padding:6px 0">—</div></div>
+          </div>
+          <div class="combo-bar">
+            <div>
+              <div class="combo-num" id="combo-num">—</div>
+              <div class="combo-label">combinações de takes</div>
+            </div>
+            <span class="combo-formula" id="combo-formula"></span>
+          </div>
+          <div class="combo-disc">Esgotadas as combinações, o varvid aplica micro-cortes e zoom para continuar gerando arquivos únicos.</div>
+        </div>
+
+        <!-- VÍDEO ÚNICO: quantas cópias saem -->
+        <div class="bloco" id="single-right" style="display:none">
+          <span class="rlabel">O que você vai receber</span>
+          <div class="combo-bar" style="border-top:none;padding-top:0">
+            <div>
+              <div class="combo-num" id="single-count">—</div>
+              <div class="combo-label">cópias únicas do seu vídeo</div>
+            </div>
+          </div>
+          <div class="combo-disc">Visualmente iguais, mas com assinatura distinta — arquivo, duração e enquadramento levemente diferentes, para não caírem como repetição.</div>
+        </div>
+      </div>
+
+      <div class="rail-pe">
+        <span class="rot">Seus vídeos ficam por 48 horas</span>
+        <span class="nota">Depois disso são apagados do armazenamento. Baixe antes de fechar.</span>
+      </div>
+    </aside>
+
+    <!-- ══════════════════════════════════════════ palco ══ -->
+    <main class="palco">
+      <div class="palco-in">
+
+        <div class="palco-cab">
+          <h1>Solte seus vídeos aqui</h1>
+          <span>Em minutos eles viram dezenas de arquivos prontos para postar.</span>
+        </div>
+
+        <!-- o balão -->
+        <div class="sec-label-row">
+          <span class="sec-label" id="upload-label">Seus takes</span>
+          <!-- Este botão mexe só na seleção da tela; o "Limpar" lá embaixo
+               apaga também o que está no servidor. Palavras diferentes para
+               coisas diferentes. -->
+          <button class="btn-ghost" id="clearTakesBtn" style="display:none" onclick="clearSelection()">trocar takes</button>
+        </div>
+        <div class="drop" id="drop" style="margin-top:-8px">
+          <input type="file" id="file" accept="video/*,.mov,.mp4,.MOV,.MP4" multiple>
+          <div class="drop-ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#101318" stroke-width="1.7" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>
+          <div class="drop-main" id="drop-main">Arraste seus takes aqui</div>
+          <div class="drop-sub" id="drop-sub">ou clique para selecionar</div>
+          <div class="drop-fmt">mp4 · mov · até 1min30 cada</div>
+          <div class="badge" id="badge">✦ <span id="fcount">0</span> arquivo(s)</div>
+        </div>
+
+        <!-- quantas variações -->
+        <div class="caixa">
+          <div class="sec-label-row">
+            <span class="sec-label">Quantas variações</span>
+            <span class="nota-inline">1 crédito por vídeo entregue — cobrado só na entrega</span>
+          </div>
+          <div class="var-grid" id="vargrid">
+            <button class="var-btn active" data-n="5">5</button><button class="var-btn" data-n="10">10</button><button class="var-btn" data-n="15">15</button>
+            <button class="var-btn" data-n="20">20</button><button class="var-btn" data-n="25">25</button><button class="var-btn" data-n="30">30</button>
+          </div>
+        </div>
+
+        <!-- gerar -->
+        <div class="gen-wrap">
+          <div class="saldo-aviso" id="saldo-aviso"></div>
+          <div class="gen-row">
+            <button class="btn-gen" id="go" disabled>Gerar variações</button>
+            <button class="btn-ghost btn-clear-all" onclick="clearAll()" title="Limpa a seleção, os resultados e os arquivos no servidor">Limpar</button>
+          </div>
+          <div class="dur-line" id="dur-line"></div>
+        </div>
+
+        <!-- progresso -->
+        <div class="prog" id="prog">
+          <div class="prog-top">
+            <span class="prog-label" id="prog-label">Renderizando…</span>
+            <span class="prog-frac"><span id="p-done">0</span> / <span id="p-total">—</span></span>
+          </div>
+          <div class="track"><div class="fill" id="fill"></div></div>
+        </div>
+
+        <!-- resultados -->
+        <div class="results" id="results">
+          <div class="results-head">
+            <span class="results-count" id="results-count">0 vídeos prontos</span>
+            <button class="btn-all" onclick="downloadAll()">Baixar todos</button>
+          </div>
+          <div class="results-warn" id="results-warn">Seus vídeos ficam disponíveis por <b>48 horas</b>. Depois disso são apagados automaticamente.</div>
+          <div class="res-grid" id="res-grid"></div>
+        </div>
+
+        <div class="empty" id="empty"><div class="empty-tx"><b>01</b> envie seus vídeos &nbsp;·&nbsp; <b>02</b> escolha quantas variações &nbsp;·&nbsp; <b>03</b> headline, se quiser &nbsp;·&nbsp; <b>04</b> gere e baixe tudo</div></div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════ planos ══ -->
+<div class="modal-bg" id="plansModal">
+  <div class="modal">
+    <div class="modal-topo">
+      <div>
+        <div class="modal-title">Poste mais. Venda mais.</div>
+        <div class="modal-sub" id="plansCurrent"></div>
+      </div>
+      <button class="modal-x" onclick="closePlans()">✕</button>
+    </div>
+    <div class="modal-corpo">
+      <div class="ciclo-sw" id="cicloSw" style="display:none">
+        <button class="ciclo-btn on" id="cicloMensal" onclick="setCiclo('mensal')">Mensal</button>
+        <button class="ciclo-btn" id="cicloAnual" onclick="setCiclo('anual')">Anual <span class="ciclo-off">2 meses grátis</span></button>
+      </div>
+      <div class="plan-grid" id="planGrid"></div>
+
+      <!-- o que vale para todos, numa linha só -->
+      <div class="plan-vale">
+        <div><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FFC700" stroke-width="2.4"><polyline points="20 6 9 17 4 12"/></svg>Remix de takes e vídeo único</div>
+        <div><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FFC700" stroke-width="2.4"><polyline points="20 6 9 17 4 12"/></svg>Crédito acumula sem teto</div>
+        <div><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FFC700" stroke-width="2.4"><polyline points="20 6 9 17 4 12"/></svg>Cancelou, o saldo continua seu</div>
+      </div>
+
+      <!-- Os termos também aparecem aqui: é neste momento que a pessoa decide
+           pagar, e é a regra de reembolso e cancelamento que ela pode querer
+           conferir antes de clicar. -->
+      <div class="modal-note">Pagamento seguro via Stripe · cancele quando quiser.
+        <a id="portalLink" style="display:none" onclick="abrirPortal()">Gerenciar assinatura</a>
+        <br><a href="/termos" target="_blank">Termos</a> ·
+        <a href="/privacidade" target="_blank">Privacidade</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+let cfg=null, sb=null, TOKEN=null;
+let mode='remix', count=5, selectedFiles=[], jobId=null, poll=null, results=[];
+const $=id=>document.getElementById(id);
+
+/* ── LIMITE DE DURAÇÃO ─────────────────────────────────────────────────────────
+   A conta que importa é em SEGUNDOS, não em megabytes: o render normaliza tudo
+   para 1080×1920, então o peso do arquivo final vem da duração, não do peso do
+   que entrou. Um vídeo de 5 min pesa ~50 MB na entrada e gera ~675 MB de saída.
+
+   O limite é verificado AQUI, antes de enviar qualquer byte — o navegador lê a
+   duração nos metadados do arquivo. Assim a pessoa descobre na hora, em vez de
+   esperar o upload inteiro para receber um erro (foi o que travou um testador).
+   Os valores vêm do servidor via /auth-config.json.                            */
+let LIM = {maxVideoSeconds:90, maxFileMB:100, maxUploadMB:200, retentionHours:48};
+
+function fmtDur(s){
+  s=Math.round(s);
+  if(s<60) return s+'s';
+  const m=Math.floor(s/60), r=s%60;
+  return r? m+'min'+String(r).padStart(2,'0') : m+'min';
+}
+/* Lê a duração do arquivo sem enviá-lo. Devolve null se o navegador não souber
+   (codec exótico) — nesse caso não bloqueamos: o servidor ainda tem a guarda. */
+function lerDuracao(file){
+  return new Promise(resolve=>{
+    const url=URL.createObjectURL(file), v=document.createElement('video');
+    const limpa=()=>{ URL.revokeObjectURL(url); };
+    const t=setTimeout(()=>{ limpa(); resolve(null); },8000);
+    v.preload='metadata';
+    v.onloadedmetadata=()=>{ clearTimeout(t); const d=v.duration; limpa();
+      resolve(isFinite(d)&&d>0 ? d : null); };
+    v.onerror=()=>{ clearTimeout(t); limpa(); resolve(null); };
+    v.src=url;
+  });
+}
+/* ── MEDIÇÃO LOCAL DOS TAKES ───────────────────────────────────────────────────
+   O /analyze devolve a duração de cada variante, mas quem mede lá é o ffprobe —
+   e o ffprobe NÃO existe no Render de propósito: o Render só coordena, quem
+   renderiza é o Modal, e instalar o ffmpeg inteiro lá pra ler um metadado seria
+   engordar o serviço pra resolver o sintoma. Resultado: em produção a duração
+   vinha 0 e o contador do Remix simplesmente não aparecia. No computador do
+   desenvolvedor funcionava, o que é o pior tipo de bug — o que só some quando
+   alguém vai olhar.
+
+   O navegador já sabe ler isso (é o que o modo único faz antes de enviar). Então
+   medimos aqui, e o valor do servidor passa a ser só um bônus: quando existe,
+   mandamos nele; quando não, o número continua aparecendo.                     */
+const DURACOES = new Map();
+
+/* O servidor renomeia os arquivos ao salvar (espaço vira _, acento some), então
+   "Hook 1.mp4" volta como "Hook_1.mp4" e a comparação direta falharia. Reduzir
+   os dois lados a letras e números faz os nomes se reencontrarem.
+   Dois arquivos diferentes podem colidir aqui ("hook-1" e "hook 1"); o efeito
+   seria uma estimativa levemente errada, nunca um bloqueio indevido. */
+function chaveArq(nome){ return String(nome||'').toLowerCase().replace(/[^a-z0-9]/g,''); }
+
+async function medirTakes(arquivos){
+  DURACOES.clear();
+  // De 4 em 4: cada leitura cria um <video> na memória, e abrir 30 de uma vez
+  // trava celular fraco — justamente o aparelho de quem grava os takes.
+  for(let i=0;i<arquivos.length;i+=4){
+    const lote=arquivos.slice(i,i+4);
+    const durs=await Promise.all(lote.map(f=>lerDuracao(f)));
+    lote.forEach((f,k)=>{ if(durs[k]!=null) DURACOES.set(chaveArq(f.name), durs[k]); });
+  }
+}
+
+function mostrarDuracao(segundos, contexto){
+  const el=$('dur-line');
+  if(segundos==null){ el.className='dur-line'; return true; }
+  const limite=LIM.maxVideoSeconds, ok=segundos<=limite;
+  el.className='dur-line show '+(ok?'ok':'over');
+  el.innerHTML = ok
+    ? '✓ '+contexto+' <b>'+fmtDur(segundos)+'</b><span class="sub">dentro do limite de '+fmtDur(limite)+'</span>'
+    : '⚠ '+contexto+' <b>'+fmtDur(segundos)+'</b><span class="sub">acima do limite de '+fmtDur(limite)+'. '
+      +(mode==='single'?'Corte o vídeo antes de subir.':'Corte um dos blocos ou grave takes mais curtos.')+'</span>';
+  return ok;
+}
+function limparDuracao(){ $('dur-line').className='dur-line'; $('dur-line').innerHTML=''; }
+let _toastTimer=null;
+function toast(t,err,ms){
+  const e=$('toast');
+  e.className='toast show'+(err?' err':'');
+  e.textContent=t;
+  e.onclick=()=>{ e.className='toast'; if(_toastTimer){clearTimeout(_toastTimer);_toastTimer=null;} };
+  if(_toastTimer){ clearTimeout(_toastTimer); _toastTimer=null; }
+  if(ms!==0){ _toastTimer=setTimeout(()=>{ e.className='toast'; }, ms||4500); }
+}
+
+async function boot(){
+  try{ cfg = await (await fetch('/auth-config.json')).json(); }catch(e){ cfg={authEnabled:false}; }
+  if(cfg && cfg.limits) LIM = Object.assign(LIM, cfg.limits);
+  // O prazo vem do servidor: mudou a regra do bucket, muda a variável e o texto
+  // acompanha — em vez de a tela prometer 48h quando já não é mais verdade.
+  const aviso=$('results-warn');
+  if(aviso) aviso.innerHTML='Seus vídeos ficam disponíveis por <b>'+LIM.retentionHours
+    +' horas</b>. Depois disso são apagados automaticamente.';
+  if(cfg.authEnabled){
+    if(typeof supabase==='undefined'){
+      $('gate').innerHTML='<div style="text-align:center;color:#aaa;font-size:14px;max-width:340px;line-height:1.6">Não consegui carregar a biblioteca de login.<br>Verifique sua internet e recarregue a página.</div>';
+      return;
+    }
+    sb = supabase.createClient(cfg.url, cfg.anonKey);
+    const {data:{session}} = await sb.auth.getSession();
+    if(!session){ location.href='/login'; return; }
+    TOKEN = session.access_token;
+    sb.auth.onAuthStateChange((_e, s)=>{ if(s && s.access_token) TOKEN = s.access_token; });
+    $('userEmail').textContent = session.user.email || '';
+    $('userWrap').style.display='flex';
+    refreshMe(); loadBilling();
+  }
+  wire();
+  setMode(location.pathname==='/single' ? 'single' : 'remix');
+  $('gate').style.display='none';
+  document.body.classList.add('ready');
+  $('plansModal').addEventListener('click', e=>{ if(e.target.id==='plansModal') closePlans(); });
+  const q=new URLSearchParams(location.search);
+  if(q.get('assinatura')==='ok'){ toast('✓ Assinatura ativada! Seus créditos foram atualizados. (toque para fechar)', false, 0); setTimeout(refreshMe,800); }
+  else if(q.get('assinatura')==='cancelada'){ toast('Assinatura cancelada — nada foi cobrado.'); }
+  else if(q.get('assinatura')==='erro'){ toast('Não consegui ativar a assinatura. Tente de novo ou me avise.',true); }
+  if(q.get('assinatura')){ history.replaceState({}, '', location.pathname); }
+  restoreLastJob();
+}
+function authHeaders(extra){const h=Object.assign({},extra||{});if(TOKEN)h['Authorization']='Bearer '+TOKEN;return h;}
+async function api(url,opts){opts=opts||{};opts.headers=authHeaders(opts.headers);return fetch(url,opts);}
+
+/* ── CAMADA DE ERRO ────────────────────────────────────────────────────────────
+   Ponto único por onde toda resposta do servidor passa. Antes, cada chamada
+   fazia `await r.json()` direto: quando o Flask devolvia 500 (página HTML), o
+   .json() lançava "Unexpected token '<'" e essa string ia parar num toast na
+   cara do usuário — foi o "erro de token/JSON" reportado no QA.
+   Regra: erro técnico vai pro console, frase em português vai pra tela.       */
+
+const HTTP_MSG={
+  401:'Sua sessão expirou. Recarregue a página e entre de novo.',
+  402:'Créditos insuficientes para esta geração.',
+  404:'Não encontrei esta geração. Ela pode ter expirado.',
+  413:'Arquivo grande demais para envio.',
+  507:'O servidor está sem espaço agora. Tente de novo em alguns minutos.'
+};
+const ERR_MSG={
+  sem_creditos:'Créditos insuficientes. Reduza a quantidade ou faça upgrade do plano.',
+  sem_assinatura:'Você ainda não tem uma assinatura para gerenciar.',
+  portal_indisponivel:'A área de assinatura não abriu agora. Tente de novo em instantes — se persistir, me chame.',
+  sem_espaco:'O servidor está sem espaço agora. Tente de novo em alguns minutos.',
+  geracao_em_andamento:'Você já tem uma geração em andamento. Espere ela terminar, ou use "Limpar" para cancelar e começar de novo.',
+  arquivo_grande_demais:'O envio ficou grande demais. Envie menos arquivos por vez, ou vídeos mais curtos.',
+  falha_io:'O servidor não conseguiu gravar seus arquivos. Tente de novo em instantes.',
+  unauthorized:'Sua sessão expirou. Recarregue a página e entre de novo.',
+  'no files':'Nenhum arquivo foi enviado.',
+  'no valid files':'Nenhum vídeo válido. Aceito .mp4, .mov, .avi, .mkv e .webm.',
+  'job not found':'Não encontrei esta geração. Envie os arquivos de novo.',
+  'files not found, please re-upload':'Os arquivos desta geração expiraram. Envie de novo.'
+};
+function httpMessage(status){
+  return HTTP_MSG[status] || (status>=500
+    ? 'O servidor não conseguiu processar agora. Tente de novo em instantes.'
+    : 'Não consegui completar a operação (erro '+status+').');
+}
+/* Traduz qualquer exceção numa frase apresentável. Rede de segurança: mesmo que
+   algum caminho novo escape, o usuário nunca vê stack trace nem "Unexpected token". */
+function friendly(e){
+  const m=(e&&e.message)||'';
+  if(/Failed to fetch|NetworkError|Load failed|ERR_INTERNET/i.test(m))
+    return 'Sem conexão com o servidor. Verifique sua internet e tente de novo.';
+  if(/Unexpected token|not valid JSON|JSON\.parse|SyntaxError/i.test(m))
+    return 'O servidor respondeu de forma inesperada. Tente de novo em instantes.';
+  return m || 'Algo deu errado. Tente de novo.';
+}
+/* Lê a resposta como JSON com segurança. Lança Error com mensagem já em PT. */
+async function readJson(r){
+  const ct=r.headers.get('content-type')||'';
+  let d=null;
+  if(ct.includes('json')){ try{ d=await r.json(); }catch(err){ d=null; } }
+  if(d===null){
+    console.error('[api] resposta não-JSON', r.status, r.url);
+    throw new Error(httpMessage(r.status));
+  }
+  if(d.error){
+    console.error('[api] erro do servidor', r.status, d.error);
+    const err=new Error(ERR_MSG[d.error] || errText(d));
+    err.code=d.error; err.data=d;
+    throw err;
+  }
+  if(!r.ok) throw new Error(httpMessage(r.status));
+  return d;
+}
+/* Faz a chamada e já devolve o JSON validado. */
+async function apiJson(url,opts){ return readJson(await api(url,opts)); }
+async function logout(){ if(sb) await sb.auth.signOut(); location.href='/login'; }
+let EU=null;
+
+/* Data legível pra quem não é de tecnologia: "13 de outubro", não "2026-10-13". */
+const MESES=['janeiro','fevereiro','março','abril','maio','junho','julho',
+             'agosto','setembro','outubro','novembro','dezembro'];
+function dataCurta(iso){
+  if(!iso) return null;
+  const d=new Date(String(iso).replace(' ','T'));
+  if(isNaN(d)) return null;
+  const hoje=new Date(), amanha=new Date(hoje.getTime()+864e5);
+  const mesmoDia=(a,b)=>a.toDateString()===b.toDateString();
+  if(mesmoDia(d,hoje)) return 'hoje';
+  if(mesmoDia(d,amanha)) return 'amanhã';
+  return d.getDate()+' de '+MESES[d.getMonth()]
+    +(d.getFullYear()!==hoje.getFullYear() ? ' de '+d.getFullYear() : '');
+}
+
+/* ── AVISO DE SALDO ────────────────────────────────────────────────────────────
+   No mensal isso quase nunca aparece, e é de propósito: existe uma rede embaixo
+   (vira o mês e repõe), então interromper a pessoa seria só barulho.
+
+   No anual é outra história. A próxima reposição pode estar a dez meses de
+   distância, e quem descobre isso com o saldo zerado descobre tarde — no meio
+   de uma campanha. Por isso o aviso vem 12x mais cedo em números absolutos, e
+   por isso ele diz o que fazer, não só que está acabando.                      */
+function avisoDeSaldo(d){
+  const faixa=$('saldo-aviso');
+  if(!faixa) return;
+  if(!(d && d.creditsEnabled && d.acabando)){ faixa.className='saldo-aviso'; return; }
+  const anual = d.ciclo==='anual';
+  const quando = dataCurta(d.renovaEm);
+  const oQueFazer = anual
+    ? 'A próxima recarga automática só vem em '+(quando||'muitos meses')+'.'
+    : (quando ? 'Renova em '+quando+'.' : '');
+  faixa.className='saldo-aviso show';
+  faixa.innerHTML='<b>'+d.credits+' vídeo(s) restantes.</b> '+oQueFazer
+    +' <a onclick="openPlans()">Ver planos</a>';
+}
+
+async function refreshMe(){
+  try{
+    const d=await (await api('/me')).json();
+    EU=d;
+    if(d.email) $('userEmail').textContent=d.email;
+    const pill=$('creditsPill');
+    if(d.creditsEnabled && d.credits!=null){
+      pill.style.display='inline-flex';
+      pill.textContent='✦ '+d.credits+' créditos';
+      pill.className='credits'+(d.acabando?' baixo':'');
+      // A data de renovação vive no title: quem quer saber passa o mouse, e
+      // quem não quer não tem mais um número na cara o tempo todo.
+      const q=dataCurta(d.renovaEm);
+      pill.title = q ? ('Próxima recarga em '+q) : '';
+    }
+    else { pill.style.display='none'; }
+    avisoDeSaldo(d);
+  }catch(e){}
+}
+let PLANS_DATA=null;
+async function loadBilling(){
+  try{
+    const d=await (await api('/billing/plans')).json(); PLANS_DATA=d;
+    if(d.stripeEnabled && d.plans && d.plans.length) $('planosBtn').style.display='inline-flex';
+  }catch(e){}
+}
+let CICLO='mensal';
+
+/* O preço vem do Stripe, não daqui. Se a consulta falhar, o cartão aparece sem
+   o valor em vez de com um valor inventado — número errado na tela de preço é
+   o pior lugar possível pra uma informação desatualizada. */
+function precoDoPlano(p){
+  const c=(p.ciclos||{})[CICLO];
+  return (c && c.preco) ? c.preco : null;
+}
+function planoTemCiclo(p){ return !!((p.ciclos||{})[CICLO]); }
+
+/* R$ 390 por ano são R$ 32,50 por mês — e é esse número que mostra o desconto.
+   Formatado aqui e não no servidor porque é conta derivada, não preço: o preço
+   continua sendo só o que o Stripe cobra. */
+function equivalenteMensal(pr){
+  const centavos=Math.round((pr.valor||0)/12);
+  if((pr.moeda||'brl').toLowerCase()!=='brl') return pr.texto;
+  const txt=(centavos/100).toFixed(2).replace('.',',').replace(',00','');
+  return 'R$ '+txt;
+}
+
+function setCiclo(c){
+  CICLO=c;
+  $('cicloMensal').className='ciclo-btn'+(c==='mensal'?' on':'');
+  $('cicloAnual').className='ciclo-btn'+(c==='anual'?' on':'');
+  desenharPlanos();
+}
+
+function desenharPlanos(){
+  $('planGrid').innerHTML=(PLANS_DATA.plans||[]).map(p=>{
+    const cur=p.key===PLANS_DATA.currentPlan;
+    const disp=planoTemCiclo(p);
+    const pr=precoDoPlano(p);
+    // No anual mostramos o total cobrado (é o que sai do bolso) e, ao lado, o
+    // equivalente mensal — que é o número com o qual a pessoa compara o plano
+    // mensal e enxerga o desconto. Repetir "vídeos por mês" aqui seria dizer
+    // duas vezes a mesma coisa: a linha de baixo já diz.
+    const linhaPreco = pr
+      ? '<div class="plan-price">'+pr.texto+'</div><div class="plan-per">'
+        +(CICLO==='anual' ? 'por ano · '+equivalenteMensal(pr)+'/mês' : 'por mês')+'</div>'
+      : '<div class="plan-per" style="margin-top:6px">preço no checkout</div>';
+    return '<div class="plan-card'+(cur?' current':'')+'">'
+      +'<div class="plan-name">'+p.label+(cur?'<span class="plan-tag">atual</span>':'')+'</div>'
+      +linhaPreco
+      +'<div class="plan-credits"><b>'+p.credits+'</b> vídeos por mês</div>'
+      +'<button class="plan-btn"'+(cur||!disp?' disabled':'')
+      +' onclick="subscribe(\''+p.key+'\')">'
+      +(cur?'Plano atual':(disp?'Assinar':'Indisponível'))+'</button></div>';
+  }).join('');
+}
+
+/* Cancelar, trocar cartão e baixar nota acontecem no Portal do Stripe. Não
+   reconstruímos isso aqui de propósito: envolveria guardar dado de cartão, que
+   é um problema que não vale a pena ter. */
+async function abrirPortal(){
+  try{
+    const d=await apiJson('/billing/portal',{method:'POST'});
+    if(d.url){ window.location.href=d.url; return; }
+    toast('Não consegui abrir a área de assinatura. Tente de novo em instantes.',true);
+  }catch(e){ toast(friendly(e),true); }
+}
+
+function openPlans(){
+  if(!PLANS_DATA) return;
+  $('plansCurrent').textContent='Seu plano atual: '+(PLANS_DATA.currentPlan||'free');
+  // O link só existe pra quem tem assinatura: oferecer "gerenciar" a quem nunca
+  // assinou levaria a uma página vazia do Stripe.
+  $('portalLink').style.display = PLANS_DATA.temAssinatura ? 'inline' : 'none';
+  // O alternador só existe se houver anual configurado no Stripe. Sem isso ele
+  // seria um botão que não leva a lugar nenhum.
+  $('cicloSw').style.display = PLANS_DATA.temAnual ? 'inline-flex' : 'none';
+  if(!PLANS_DATA.temAnual) CICLO='mensal';
+  setCiclo(CICLO);
+  $('plansModal').classList.add('show');
+}
+function closePlans(){ $('plansModal').classList.remove('show'); }
+async function subscribe(key){
+  try{
+    const d=await apiJson('/billing/checkout',{method:'POST',
+      headers:{'Content-Type':'application/json'},body:JSON.stringify({plan:key,ciclo:CICLO})});
+    if(d.url){ window.location.href=d.url; }
+    else { toast('Não consegui iniciar o pagamento. Tente de novo em instantes.',true); }
+  }catch(e){ toast(friendly(e),true); }
+}
+
+function setMode(m){
+  // Trocar de aba durante o render limparia o polling e deixaria o job órfão:
+  // a tela ficaria ociosa enquanto o backend ainda o considera em andamento.
+  if(gerando){ toast('Espere a geração terminar para trocar de modo.',true); return; }
+  mode=m; resetJob();
+  const single = m==='single';
+  $('tab-single').classList.toggle('active',single);
+  $('tab-remix').classList.toggle('active',!single);
+  // Cada modo tem o SEU passo 1. Sem isso o modo único abria no passo 2, e
+  // passo 2 sem passo 1 parece que a tela carregou pela metade.
+  $('naming-sec').style.display = single?'none':'block';
+  $('single-sec').style.display = single?'block':'none';
+  $('upload-label').textContent = single?'Seu vídeo':'Seus takes';
+  $('drop-main').textContent = single?'Arraste 1 vídeo pronto':'Arraste seus takes aqui';
+  // QA #6: "ou vários pra gerar em lote" contradizia o nome do modo.
+  // Agora o modo único aceita UM arquivo e diz isso em três lugares: no texto,
+  // no seletor do sistema (sem 'multiple') e no aviso se alguém soltar vários.
+  $('drop-sub').textContent = single?'.mp4 · .mov — apenas 1 vídeo':'ou clique para selecionar';
+  // Sem o atributo 'multiple' o próprio seletor do macOS/Windows só deixa
+  // escolher um arquivo — o aviso vira impossibilidade, não só texto.
+  if(single) $('file').removeAttribute('multiple');
+  else       $('file').setAttribute('multiple','');
+  $('remix-right').style.display = single?'none':'block';
+  $('single-right').style.display = single?'block':'none';
+  clearSelection();
+  showEmpty(true);
+}
+function resetJob(){ if(poll){clearInterval(poll);poll=null;} jobId=null; results=[]; $('prog').className='prog'; $('results').className='results'; $('res-grid').innerHTML=''; }
+function showEmpty(v){ $('empty').style.display = v?'flex':'none'; }
+/* Um só para os dois guias: o do Remix e o do Vídeo único abrem e fecham igual.
+   Duas funções iguais seriam dois lugares pra corrigir quando algo mudasse. */
+function toggleGuia(qual){
+  $(qual+'-hdr').classList.toggle('open');
+  $(qual+'-body').classList.toggle('open');
+}
+
+function wire(){
+  const drop=$('drop'), file=$('file');
+  ['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('over');}));
+  ['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('over');}));
+  drop.addEventListener('drop',e=>onFiles(e.dataTransfer.files));
+  file.addEventListener('change',e=>onFiles(e.target.files));
+  $('vargrid').addEventListener('click',e=>{ if(!e.target.dataset.n)return; count=parseInt(e.target.dataset.n);
+    document.querySelectorAll('.var-btn').forEach(b=>b.classList.toggle('active',b===e.target)); });
+  $('go').addEventListener('click',generate);
+}
+
+/* Rede de segurança do ponto de entrada.
+
+   onFiles virou async quando passou a ler a duração do vídeo, e é chamada pelos
+   eventos assim: `e => onFiles(e.target.files)`. Numa função async, uma exceção
+   vira uma promessa rejeitada SEM ninguém escutando — a pessoa selecionaria o
+   arquivo e nada aconteceria. Nenhum aviso, nenhuma pista: o app pareceria morto.
+
+   Enquanto era síncrona, um erro pelo menos borbulhava. Este invólucro devolve
+   esse comportamento: seja o que for que quebre aqui dentro, vira mensagem na
+   tela e rastro no console, e a seleção é zerada para a pessoa poder tentar de
+   novo em vez de ficar num estado pela metade.                                */
+async function onFiles(fl){
+  try{
+    await _onFiles(fl);
+  }catch(e){
+    console.error('[onFiles] falha inesperada', e);
+    toast('Não consegui ler seus arquivos. Tente selecionar de novo — se persistir, recarregue a página.',true);
+    try{ clearSelection(); limparDuracao(); }catch(_){}
+  }
+}
+
+async function _onFiles(fl){
+  if(gerando){   // trava também o arrastar-e-soltar, que ignora input.disabled
+    toast(ERR_MSG.geracao_em_andamento,true);
+    return;
+  }
+  limparDuracao();
+  const exts=['.mp4','.mov','.avi','.mkv','.webm'];
+  const all=Array.from(fl);
+  selectedFiles=all.filter(f=>exts.some(x=>f.name.toLowerCase().endsWith(x)));
+  const rejeitados=all.length-selectedFiles.length;
+
+  // Arrastar-e-soltar ignora a falta do 'multiple' no input: dá pra soltar 10
+  // arquivos de uma vez. Aqui a regra do modo único é aplicada de verdade.
+  let excedentes=0;
+  if(mode==='single' && selectedFiles.length>1){
+    excedentes=selectedFiles.length-1;
+    selectedFiles=[selectedFiles[0]];
+  }
+
+  $('badge').innerHTML='✦ <span id="fcount">'+selectedFiles.length+'</span> arquivo(s)';
+  $('badge').className = selectedFiles.length?'badge show':'badge';
+  updateClearButtons();
+  if(rejeitados>0) toast(rejeitados+' arquivo(s) ignorado(s) — aceito .mp4, .mov, .avi, .mkv e .webm.',true);
+  if(excedentes>0){
+    toast('O modo Vídeo único usa 1 vídeo por vez — mantive "'+selectedFiles[0].name+'" e ignorei os outros '+excedentes+'. Para juntar takes, use a aba Remix de takes.',true,0);
+  }
+  if(!selectedFiles.length){ $('go').disabled=true; return; }
+
+  // Peso: rede de segurança secundária. Não é o número que a pessoa vê na tela,
+  // só aparece quando alguém esbarra nele.
+  const pesados=selectedFiles.filter(f=>f.size > LIM.maxFileMB*1024*1024);
+  if(pesados.length){
+    toast('"'+pesados[0].name+'" tem '+Math.round(pesados[0].size/1048576)+' MB — o limite por arquivo é '+LIM.maxFileMB+' MB.',true,0);
+    clearSelection(); return;
+  }
+  const totalMB=selectedFiles.reduce((a,f)=>a+f.size,0)/1048576;
+  if(totalMB > LIM.maxUploadMB){
+    toast('Seus arquivos somam '+Math.round(totalMB)+' MB e o envio aceita até '+LIM.maxUploadMB+' MB. Envie menos takes por vez.',true,0);
+    clearSelection(); return;
+  }
+
+  // Modo único: a duração é conferida ANTES do upload. É o ponto em que o
+  // testador travou — subiu 5 min, esperou, e só então deu erro.
+  if(mode==='single'){
+    $('badge').innerHTML='<span class="spin"></span> conferindo…'; $('badge').className='badge show';
+    const dur=await lerDuracao(selectedFiles[0]);
+    $('badge').innerHTML='✦ <span id="fcount">1</span> arquivo(s)'; $('badge').className='badge show';
+    if(!mostrarDuracao(dur,'Seu vídeo tem')){
+      $('go').disabled=true;                     // nada é enviado
+      return;
+    }
+  }
+  if(mode==='remix'){
+    // Medir ANTES de enviar: os arquivos já estão aqui, a leitura é só de
+    // metadado e não custa rede nenhuma. Se deixássemos pro servidor, o número
+    // não apareceria em produção — foi exatamente o que aconteceu.
+    $('badge').innerHTML='<span class="spin"></span> conferindo…'; $('badge').className='badge show';
+    await medirTakes(selectedFiles);
+    analyze();
+  }
+  else { $('go').disabled=false; showEmpty(false); }
+}
+
+async function analyze(){
+  $('go').disabled=true;
+  $('badge').innerHTML='<span class="spin"></span> analisando…'; $('badge').className='badge show';
+  const fd=new FormData(); selectedFiles.forEach(f=>fd.append('files',f,f.name));
+  try{
+    const d=await apiJson('/analyze',{method:'POST',body:fd});
+    jobId=d.job_id;
+    renderStructure(d.summary||{}, d.max_combinations||1);
+    $('badge').innerHTML='✦ '+selectedFiles.length+' arquivo(s)'; $('badge').className='badge show';
+    $('go').disabled=false; showEmpty(false);
+    // Nenhum bloco reconhecido => o render sairia com 0 vídeos e ainda cobraria
+    // os créditos. Melhor barrar aqui e explicar o que fazer.
+    if(!Object.keys(d.summary||{}).length){
+      $('go').disabled=true;
+      toast('Não reconheci nenhum bloco nos nomes dos arquivos. Renomeie para Hook1, CTA1, Story… (abra o guia acima).',true,0);
+      return;
+    }
+    // O vídeo final é UM take de cada bloco, não a soma de tudo que subiu.
+    // Somar os uploads daria um número assustador e errado. O /analyze já
+    // devolve a duração de cada variante — aqui pegamos o pior caso (a variante
+    // mais longa de cada bloco), que é o que pode estourar o limite.
+    if(!mostrarDuracao(duracaoMontada(d.summary), 'Seu vídeo vai ter até')) $('go').disabled=true;
+  }catch(e){
+    toast(friendly(e),true);
+    $('badge').className='badge'; $('go').disabled=true;
+  }
+}
+
+/* Pior caso do vídeo montado: a variante mais longa de cada bloco.
+
+   Duas fontes, nesta ordem: o servidor, quando conseguiu medir (ambiente local,
+   com ffprobe), e a medição do navegador, que é a que vale em produção. Se as
+   duas falharem devolve null — e null não bloqueia nada, porque impedir alguém
+   de gerar por causa de um codec que não soubemos ler seria trocar um contador
+   ausente por uma ferramenta travada. */
+function duracaoVariante(v){
+  if(v && v.duration>0) return v.duration;               // servidor mediu
+  const arqs=(v && v.files)||[];
+  let soma=0, achou=false;
+  arqs.forEach(nome=>{
+    const d=DURACOES.get(chaveArq(nome));
+    if(d!=null){ soma+=d; achou=true; }
+  });
+  return achou ? soma : 0;   // uma variante é a soma das suas partes (_pt1, _pt2…)
+}
+
+function duracaoMontada(summary){
+  let total=0, mediu=false;
+  Object.values(summary||{}).forEach(variantes=>{
+    const maior=Math.max(...variantes.map(duracaoVariante));
+    if(maior>0){ total+=maior; mediu=true; }
+  });
+  return mediu ? total : null;
+}
+
+const BLOCK_ORDER=['hook','story','revelacao','prova','cta'];
+const SWAP=new Set(['hook','cta']);
+const BCOLOR={hook:'var(--hook)',story:'var(--story)',revelacao:'var(--rev)',prova:'var(--prova)',cta:'var(--cta)'};
+function cap(s){return s.charAt(0).toUpperCase()+s.slice(1);}
+function renderStructure(summary,maxCombos){
+  const vary=$('vary-blocks'), fixed=$('fixed-blocks'); vary.innerHTML=''; fixed.innerHTML='';
+  let parts=[];
+  BLOCK_ORDER.forEach(b=>{
+    if(!summary[b])return;
+    const n=summary[b].length, takes=summary[b].reduce((a,v)=>a+v.parts,0);
+    if(SWAP.has(b)){
+      vary.insertAdjacentHTML('beforeend',`<div class="mx-row on"><div><div class="mx-rname">${cap(b)}</div><div class="mx-rsub">${takes} take(s)</div></div><span class="mx-tag acc">${n}</span></div>`);
+      if(n>1)parts.push(n+' '+b);
+    }else{
+      fixed.insertAdjacentHTML('beforeend',`<div class="mx-row soon"><div><div class="mx-rname" style="color:#888">${cap(b)}</div><div class="mx-rsub">${takes} take(s)</div></div><span class="mx-tag">fixo</span></div>`);
+    }
+  });
+  if(!vary.innerHTML)vary.innerHTML='<div style="font-size:11px;color:#333;padding:6px 0">nenhum hook/cta</div>';
+  if(!fixed.innerHTML)fixed.innerHTML='<div style="font-size:11px;color:#333;padding:6px 0">—</div>';
+  $('combo-num').textContent=maxCombos;
+  $('combo-formula').textContent = parts.length? parts.join(' × ')+' = '+maxCombos+' combos' : 'estrutura linear';
+}
+
+async function generate(){
+  if(!selectedFiles.length || gerando)return;
+  setGerando(true);
+  $('go').textContent='GERANDO…';
+  results=[]; renderResults(); showEmpty(false);
+  const headline=$('hl').value.trim(), hd=parseInt($('hd').value||'3')||3;
+  try{
+    if(mode==='single'){
+      $('single-count').textContent=count;
+      // No modo single o upload só acontece agora — pode demorar. Sem aviso, a
+      // tela ficava muda (QA #4).
+      $('prog').className='prog show';
+      $('prog-label').textContent='Enviando seu vídeo…';
+      $('p-total').textContent=count; $('p-done').textContent=0; $('fill').style.width='0%';
+      const fd=new FormData(); selectedFiles.forEach(f=>fd.append('files',f,f.name));
+      fd.append('count',count); fd.append('headline_text',headline); fd.append('headline_duration',hd);
+      const d=await apiJson('/single/generate',{method:'POST',body:fd});
+      jobId=d.job_id;
+    }else{
+      if(!jobId){ toast('Envie os takes primeiro.',true); resetBtn(); return; }
+      const d=await apiJson('/generate',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({job_id:jobId,count,headline_text:headline,headline_duration:hd})});
+    }
+    startPolling();
+  }catch(e){
+    toast(friendly(e),true);
+    $('prog').className='prog';
+    resetBtn();
+    if(e.code==='sem_creditos') refreshMe();
+  }
+}
+function resetBtn(){ setGerando(false); $('go').textContent='▶ GERAR VARIAÇÕES'; }
+function errText(d){ if(d.error==='sem_creditos'){ return 'Créditos insuficientes'+(d.credits!=null?' ('+d.credits+' restantes)':'')+'. Reduza a quantidade ou faça upgrade do plano.'; } return 'Erro: '+d.error; }
+
+/* O polling antigo engolia TODO erro em silêncio ("ignora blips de rede").
+   Quando o /status passou a devolver 500 permanente (JSON de job corrompido),
+   a barra congelava e nada acontecia nunca — daí o "sempre tenho que dar F5"
+   do QA. Agora: blip tolerado, falha persistente encerra e avisa.            */
+const POLL_MAX_FAILS=6;          // ~9s de tolerância a 1,5s por tentativa
+function startPolling(){
+  $('prog').className='prog show'; $('p-total').textContent=count; $('p-done').textContent=0; $('fill').style.width='0%';
+  $('prog-label').textContent='Renderizando…';
+  let fails=0;
+  const stop=()=>{ if(poll){clearInterval(poll); poll=null;} };
+  poll=setInterval(async()=>{
+    let st;
+    try{
+      st=await apiJson('/status/'+jobId);
+      fails=0;
+    }catch(e){
+      fails++;
+      console.warn('[status] falha '+fails+'/'+POLL_MAX_FAILS, e);
+      if(fails>=POLL_MAX_FAILS){
+        stop(); resetBtn();
+        $('prog-label').textContent='Interrompido';
+        toast('Perdi o contato com esta geração. '+friendly(e)+' Toque em "Limpar" e tente de novo. (toque para fechar)',true,0);
+      }
+      return;
+    }
+    if(st.status==='not_found'){
+      stop(); resetBtn();
+      $('prog').className='prog';
+      toast('Esta geração não existe mais no servidor. Envie os arquivos de novo.',true);
+      clearLastJob();
+      return;
+    }
+    const done=st.completed||0;
+    $('p-done').textContent=done; $('fill').style.width=(st.progress||0)+'%';
+    $('prog-label').textContent = st.status==='done'?'Concluído':'Renderizando…';
+    if((st.files||[]).length!==results.length){ results=st.files||[]; renderResults(); }
+    if(st.status==='done'||st.status==='error'){
+      stop(); resetBtn(); refreshMe();
+      if(st.status==='error'){
+        toast('A geração falhou. '+(st.error||'Tente de novo em instantes.'),true);
+      }else if(!results.length){
+        // terminou "com sucesso" e zero arquivos: takes irreconhecíveis
+        toast('A geração terminou sem nenhum vídeo. Confira os nomes dos arquivos (Hook1, CTA1, Story…) e tente de novo.',true,0);
+      }
+    }
+  },1500);
+}
+
+function renderResults(){
+  const grid=$('res-grid');
+  if(!results.length){ $('results').className='results'; return; }
+  $('results').className='results show';
+  $('results-count').textContent=results.length+' vídeo(s) pronto(s)';
+  grid.innerHTML=results.map((f,i)=>`<div class="res"><div class="n">Variação ${String(i+1).padStart(2,'0')}</div><button class="b" onclick="dl('${f}')">⬇</button></div>`).join('');
+  saveLastJob();
+}
+/* Dois caminhos de download:
+   · com R2, o servidor devolve um LINK assinado e o navegador baixa direto do
+     bucket — os bytes não passam pelo nosso servidor, e o download aparece no
+     gerenciador do navegador em vez de ficar preso na memória da aba;
+   · sem R2 (rodando local), o arquivo vem no corpo da resposta, como antes.
+   O front detecta pelo tipo da resposta, então os dois modos convivem.        */
+async function dl(f){
+  try{
+    const r=await api('/download/'+jobId+'/'+f);
+    if(!r.ok){ toast(httpMessage(r.status),true); return; }
+    const ct=r.headers.get('content-type')||'';
+    let href, revogar=null;
+    if(ct.includes('json')){
+      const d=await r.json();
+      if(!d.url){ toast('Não consegui gerar o link deste vídeo.',true); return; }
+      href=d.url;                       // link assinado do bucket
+    }else{
+      const b=await r.blob();
+      href=URL.createObjectURL(b); revogar=href;
+    }
+    const a=document.createElement('a');
+    a.href=href; a.download=f; a.rel='noopener';
+    document.body.appendChild(a); a.click(); a.remove();
+    if(revogar) setTimeout(()=>URL.revokeObjectURL(revogar),4000);
+  }catch(e){ toast(friendly(e),true); }
+}
+async function downloadAll(){ for(const f of results){ await dl(f); await new Promise(r=>setTimeout(r,400)); } }
+
+/* ── LIMPAR ────────────────────────────────────────────────────────────────────
+   O endpoint /admin/clear já existia no backend desde sempre e o front nunca o
+   chamava. Os dois pedidos de "botão de limpar" do QA eram só isto.
+   De quebra resolve o F5: o input de arquivo é zerado, então reselecionar o
+   MESMO arquivo volta a disparar o evento 'change' (o browser não dispara
+   quando o valor não muda).                                                   */
+
+function clearSelection(){          // só a seleção local, não mexe no servidor
+  selectedFiles=[];
+  DURACOES.clear();                 // medições da seleção antiga não valem pra próxima
+  $('file').value='';               // <- é isto que devolve o evento 'change'
+  $('badge').innerHTML='✦ <span id="fcount">0</span> arquivo(s)';
+  $('badge').className='badge';
+  $('go').disabled=true;
+  updateClearButtons();
+}
+
+async function clearAll(){          // seleção + resultados + arquivos no servidor
+  if(poll){ clearInterval(poll); poll=null; }
+
+  // A limpeza do SERVIDOR é o que destrava uma nova geração. Antes o erro era
+  // engolido e a tela dizia "Tudo limpo" de qualquer jeito — a pessoa achava que
+  // tinha resolvido e continuava barrada, sem entender por quê.
+  let servidorOk=false;
+  try{
+    const r=await api('/admin/clear',{method:'POST'});
+    servidorOk = r.ok;
+    if(!r.ok) console.error('[clear] servidor recusou', r.status);
+  }catch(e){ console.error('[clear] servidor não respondeu', e); }
+
+  clearSelection();
+  limparDuracao();
+  jobId=null; results=[];
+  $('results').className='results';
+  $('res-grid').innerHTML='';
+  $('prog').className='prog';
+  clearLastJob();
+  resetBtn();
+  showEmpty(true);
+  if(mode==='remix'){ renderStructure({},'—'); }
+  refreshMe();
+
+  if(servidorOk) toast('Tudo limpo. Pode começar de novo.');
+  else toast('Limpei esta tela, mas não consegui falar com o servidor — se ainda aparecer "geração em andamento", aguarde um instante e tente de novo.',true,0);
+}
+
+function updateClearButtons(){
+  const b=$('clearTakesBtn');
+  if(b) b.style.display = selectedFiles.length ? 'inline-flex' : 'none';
+}
+
+/* ── TRAVA DURANTE A GERAÇÃO ───────────────────────────────────────────────────
+   O botão GERAR já ficava desabilitado, mas a área de upload continuava ativa —
+   arrastar um arquivo novo no meio do render disparava /analyze, que apagava o
+   job em andamento (créditos já cobrados, nenhum vídeo entregue).
+   O backend agora recusa com 409; aqui a interface deixa claro ANTES do clique,
+   em vez de deixar o usuário esbarrar num erro.                               */
+let gerando=false;
+function setGerando(v){
+  gerando=v;
+  const drop=$('drop');
+  $('file').disabled=v;
+  drop.classList.toggle('locked',v);
+  drop.title = v ? 'Aguarde a geração atual terminar' : '';
+  $('go').disabled = v || !selectedFiles.length;
+  updateClearButtons();
+}
+
+// Lembra a última geração pra sobreviver a um reload sem querer
+function saveLastJob(){ try{ if(jobId) localStorage.setItem('varvid_last_job', JSON.stringify({jobId:jobId, ts:Date.now()})); }catch(e){} }
+function clearLastJob(){ try{ localStorage.removeItem('varvid_last_job'); }catch(e){} }
+async function restoreLastJob(){
+  let saved=null; try{ saved=JSON.parse(localStorage.getItem('varvid_last_job')||'null'); }catch(e){}
+  if(!saved || !saved.jobId) return;
+  let st;
+  try{ st=await apiJson('/status/'+saved.jobId); }
+  catch(e){ clearLastJob(); return; }          // job sumiu ou deu erro: começa limpo
+  const files=st.files||[];
+  if(st.status==='not_found' || (!files.length && st.status!=='rendering')){ clearLastJob(); return; }
+  jobId=saved.jobId; results=files; renderResults(); showEmpty(false);
+  if(st.status==='rendering'||st.status==='queued'){
+    setGerando(true);          // retomou um job vivo: a trava volta com ele
+    $('go').textContent='GERANDO…';
+    startPolling();
+  }
+}
+
+boot();
+</script>
+</body></html>
+
+</body></html>

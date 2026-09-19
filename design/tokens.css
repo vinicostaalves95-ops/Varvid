@@ -1,0 +1,140 @@
+/* ─────────────────────────────────────────────────────────────────────────────
+   varvid — direção C · Console
+   Tokens da identidade visual. Use estas variáveis em vez de repetir hex no
+   app.html: quando a paleta mudar, muda num lugar só.
+   ───────────────────────────────────────────────────────────────────────────── */
+
+:root {
+  /* ── cor ─────────────────────────────────────────────────────────────────── */
+  --vv-grafite:        #101318;  /* texto principal, botões escuros, faixas */
+  --vv-amarelo:        #FFC700;  /* ação primária e UM número por cartão */
+  --vv-fundo:          #F2F3F5;  /* fundo da aplicação */
+  --vv-superficie:     #FFFFFF;  /* cartões — onde todo texto se apoia */
+
+  --vv-placa:          #E6EAEF;  /* base do gradiente que ancora títulos */
+  --vv-placa-suave:    #F7F8FA;  /* cabeçalhos de modal, notas, colunas-rótulo */
+  --vv-trilho:         #E9EDF2;  /* barras de progresso vazias, tags neutras */
+  --vv-escuro-2:       #2A2F37;  /* trilho dentro de cartão escuro */
+
+  --vv-linha:          #E3E6EA;  /* borda de cartão */
+  --vv-linha-suave:    #EBEEF1;  /* divisória interna */
+  --vv-linha-campo:    #D5DAE1;  /* borda de input e botão de contorno */
+
+  --vv-texto:          #101318;
+  --vv-texto-2:        #4A525E;  /* corpo */
+  --vv-texto-3:        #5B6470;  /* apoio */
+  --vv-texto-4:        #8A93A0;  /* rótulo, meta, mono */
+  --vv-texto-5:        #A3ABB6;  /* desabilitado */
+  --vv-sobre-escuro:   #6B7480;  /* meta dentro de cartão escuro */
+
+  --vv-amarelo-fundo:  #FFFCF0;  /* destaque de coluna/linha recomendada */
+  --vv-amarelo-linha:  #F0DC93;  /* borda do destaque e de campo pendente */
+  --vv-amarelo-texto:  #8A7A45;  /* texto de apoio sobre fundo amarelado */
+  --vv-ok:             #35B37E;  /* único verde do sistema: status operacional */
+
+  /* ── tipografia ──────────────────────────────────────────────────────────── */
+  --vv-fonte: 'Poppins', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --vv-mono: ui-monospace, 'SF Mono', 'IBM Plex Mono', Menlo, monospace;
+
+  /* Poppins é larga e redonda: o tracking negativo precisa ser contido.
+     Tamanho grande fecha mais; texto corrido fica em zero. */
+  --vv-track-display: -0.032em;  /* 32px+ */
+  --vv-track-titulo:  -0.028em;  /* 20–30px */
+  --vv-track-sub:     -0.022em;  /* 15–19px */
+  --vv-track-corpo:    0;
+
+  --vv-t-display: 38px;
+  --vv-t-titulo:  22px;
+  --vv-t-secao:   15px;
+  --vv-t-corpo:   13px;
+  --vv-t-ui:    13.5px;
+  --vv-t-meta:  12.5px;
+  --vv-t-mini:  11.5px;
+  --vv-t-rotulo: 10.5px;   /* caixa alta, tracking +0.14em, peso 600 */
+
+  /* ── forma ───────────────────────────────────────────────────────────────── */
+  --vv-r-cartao:  12px;
+  --vv-r-campo:    9px;
+  --vv-r-tag:      5px;
+  --vv-r-pilula: 999px;
+
+  --vv-h-botao:   44px;   /* mínimo de área de toque em telas grandes */
+  --vv-h-campo:   44px;
+  --vv-h-topo:    56px;
+  --vv-l-menu:   236px;
+  --vv-l-estado: 328px;
+
+  --vv-esp-1:  6px;
+  --vv-esp-2:  8px;
+  --vv-esp-3: 12px;
+  --vv-esp-4: 16px;
+  --vv-esp-5: 20px;
+  --vv-esp-6: 24px;
+}
+
+/* ── regras que valem em qualquer tela ──────────────────────────────────────
+   1. Nenhum texto solto no fundo. Todo bloco se apoia em .vv-cartao ou .vv-placa.
+   2. A placa é gradiente: dissolve no fundo em vez de virar caixa.
+   3. Título de várias linhas escurece para claro — o fade por linha.
+   4. O amarelo marca a ação primária e um número por cartão. Nada além disso. */
+
+.vv-cartao {
+  background: var(--vv-superficie);
+  border: 1px solid var(--vv-linha);
+  border-radius: var(--vv-r-cartao);
+}
+
+.vv-placa {
+  background: linear-gradient(180deg, var(--vv-placa) 0%, rgba(242, 243, 245, 0) 100%);
+  border-radius: 18px;
+  padding: 24px 40px 32px;
+}
+
+/* Fade por linha: aplique nas linhas de um título, da primeira à última. */
+.vv-fade-1 { color: var(--vv-texto); }
+.vv-fade-2 { color: var(--vv-texto-3); }
+.vv-fade-3 { color: var(--vv-texto-4); }
+
+/* Máscara no fim de um bloco que continua além da área visível. */
+.vv-fade-fim {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 92px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, #FFFFFF 78%);
+  pointer-events: none;
+}
+
+.vv-rotulo {
+  font-size: var(--vv-t-rotulo);
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--vv-texto-4);
+}
+
+.vv-btn-primario {
+  font-family: var(--vv-fonte);
+  font-size: 14px; font-weight: 600;
+  color: var(--vv-grafite); background: var(--vv-amarelo);
+  border: none; border-radius: var(--vv-r-campo);
+  padding: 13px 24px; cursor: pointer;
+}
+.vv-btn-escuro {
+  font-family: var(--vv-fonte);
+  font-size: var(--vv-t-ui); font-weight: 500;
+  color: #FFFFFF; background: var(--vv-grafite);
+  border: none; border-radius: var(--vv-r-campo);
+  padding: 11px 18px; cursor: pointer;
+}
+.vv-btn-contorno {
+  font-family: var(--vv-fonte);
+  font-size: var(--vv-t-ui); font-weight: 500;
+  color: var(--vv-grafite); background: var(--vv-superficie);
+  border: 1px solid var(--vv-linha-campo); border-radius: var(--vv-r-campo);
+  padding: 11px 18px; cursor: pointer;
+}
+
+/* Campo que ainda precisa ser preenchido (ver os documentos legais). */
+.vv-pendente {
+  font-family: var(--vv-mono); font-size: var(--vv-t-mini);
+  background: #FFF6D4; border: 1px solid var(--vv-amarelo-linha);
+  border-radius: 4px; padding: 1px 6px;
+}

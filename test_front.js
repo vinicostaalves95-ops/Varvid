@@ -163,6 +163,72 @@ gerando=false; mode='single';
   check('e não fala em recarga automática distante',
         !/só vem em/.test(av), av);
 
+  console.log('\\n[Indicação] o código do link sobrevive ao cadastro');
+  // Entre clicar no link e existir uma conta tem um formulário e um e-mail de
+  // confirmação no meio. A URL original não chega lá; o navegador sim.
+  const guardado={};
+  global.localStorage={getItem:k=>(k in guardado?guardado[k]:null),
+                      setItem:(k,v)=>{guardado[k]=String(v)},
+                      removeItem:k=>{delete guardado[k]}};
+  global.URLSearchParams=class{
+    constructor(s){ this.s=s||''; }
+    get(k){ const m=new RegExp('[?&]'+k+'=([^&]*)').exec(this.s); return m?m[1]:null; }
+  };
+
+  location.search='?ref=abc123';
+  guardarRefDaURL();
+  check('guarda o código do link', guardado.varvid_ref==='ABC123', JSON.stringify(guardado));
+
+  delete guardado.varvid_ref;
+  location.search='?assinatura=ok';
+  guardarRefDaURL();
+  check('sem ?ref não guarda nada', !('varvid_ref' in guardado), JSON.stringify(guardado));
+
+  guardado.varvid_ref='ABC123';
+  await resolverIndicacaoPendente();
+  check('depois de tentar registrar, a chave some',
+        !('varvid_ref' in guardado), JSON.stringify(guardado));
+  // Insistir num código recusado repetiria o erro em toda visita.
+  await resolverIndicacaoPendente();
+  check('e não fica tentando pra sempre', !('varvid_ref' in guardado));
+
+  console.log('\\n[Duração] estourar o limite avisa, não só trava o botão');
+  // O GERAR fica desabilitado quando o vídeo passa do limite. Enquanto o motivo
+  // vivia só na linha embaixo do botão — fora da tela em notebook — o que a
+  // pessoa via era um botão morto sem explicação.
+  const antes=avisos.length;
+  mode='single';
+  check('91s continua sendo barrado', mostrarDuracao(91,'Seu vídeo tem')===false);
+  check('e agora explica por que o GERAR não liga',
+        avisos.slice(antes).some(a=>/Não dá pra gerar/.test(a)), JSON.stringify(avisos.slice(antes)));
+  check('dizendo o que fazer', avisos.slice(antes).some(a=>/Corte o vídeo/.test(a)),
+        JSON.stringify(avisos.slice(antes)));
+  const antes2=avisos.length;
+  check('dentro do limite não incomoda', mostrarDuracao(30,'Seu vídeo tem')===true);
+  check('e não dispara aviso nenhum', avisos.length===antes2, JSON.stringify(avisos.slice(antes2)));
+
+  console.log('\\n[Limpar] apagar vídeo já gerado pede confirmação');
+  // O Limpar destrói vídeos que JÁ FORAM COBRADOS. Quem clicava achando que
+  // estava só limpando a tela perdia o lote e pagava de novo pra refazer — a
+  // queixa de "crédito cobrado em dobro" do QA. Agora o botão vira a pergunta.
+  const btn=els['clearAllBtn']||document.getElementById('clearAllBtn');
+  desarmarLimpar();
+  results=[{},{},{}];
+  clearAll();                       // 1º clique: só arma, não apaga nada
+  check('o botão diz quantos vídeos somem', /Apagar 3 vídeo/.test(btn.textContent), btn.textContent);
+  // toast foi trocado lá no bloco [4] por um coletor: os avisos caem em 'avisos'.
+  check('e avisa que o crédito não volta',
+        avisos.some(a=>/créditos deles não voltam/i.test(a)), JSON.stringify(avisos.slice(-1)));
+
+  desarmarLimpar();
+  check('desarmado, o botão volta ao normal', btn.textContent==='✕ Limpar', btn.textContent);
+
+  // Sem resultado na tela — geração travada, erro sem entrega — o Limpar é a
+  // válvula de escape e não pode ganhar um obstáculo.
+  results=[];
+  clearAll();
+  check('sem vídeo gerado, não pergunta nada', btn.textContent==='✕ Limpar', btn.textContent);
+
   check('data vira "13 de outubro"', /^\\d+ de [a-zç]+/.test(dataCurta('2026-10-13')), dataCurta('2026-10-13'));
   check('data ilegível não quebra a tela', dataCurta('nada disso')===null);
   check('sem data, também não quebra', dataCurta(null)===null);

@@ -173,7 +173,19 @@ function traduzir(msg){
   return 'Não consegui completar essa ação agora. Tente de novo em instantes.';
 }
 
+/* O código de indicação chega aqui em ?ref= e precisa sobreviver ao cadastro
+   inteiro — formulário, e-mail de confirmação, volta pra cá — até existir uma
+   conta pra vincular. A URL original não sobrevive a isso; o navegador sim.
+   Quem resgata e envia ao servidor é o app, no primeiro acesso já logado. */
+function guardarRefDaURL(){
+  try{
+    const c=new URLSearchParams(location.search).get('ref');
+    if(c) localStorage.setItem('varvid_ref', c.trim().toUpperCase());
+  }catch(e){}
+}
+
 async function boot(){
+  guardarRefDaURL();
   cfg = await (await fetch('/auth-config.json')).json();
   if(!cfg.authEnabled){
     // Sem Supabase configurado → modo local, sem login

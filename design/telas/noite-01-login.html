@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>varvid — N01 · Login</title>
+<link rel="icon" href="../favicon.svg">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap">
+<style>
+  html, body { margin: 0; background: #DDE1E6; }
+  body { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 28px; box-sizing: border-box; }
+  .moldura { box-shadow: 0 18px 50px rgba(16, 19, 24, 0.18); border-radius: 10px; overflow: hidden; }
+  a { color: #FFC700; } a:hover { color: #FFD84A; }
+</style>
+</head>
+<body>
+<div class="moldura">
+<div style="width: 1440px; height: 900px; background: #0B0E12; color: #FFFFFF; font-family: 'Poppins', system-ui, sans-serif; position: relative; overflow: hidden;">
+
+  <!-- brilho -->
+  <div style="position: absolute; width: 900px; height: 900px; left: -180px; top: 120px; border-radius: 50%; background: radial-gradient(circle, rgba(255, 199, 0, 0.16) 0%, rgba(255, 199, 0, 0.05) 42%, rgba(255, 199, 0, 0) 68%); animation: vv-brilhar 9s ease-in-out infinite;"></div>
+
+  <!-- grade de fundo -->
+  <div style="position: absolute; inset: 0; background-image: linear-gradient(rgba(255, 255, 255, 0.028) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.028) 1px, transparent 1px); background-size: 64px 64px;"></div>
+  <div style="position: absolute; inset: 0; background: linear-gradient(160deg, rgba(11, 14, 18, 0) 30%, #0B0E12 92%);"></div>
+
+  <div style="position: relative; height: 100%; display: grid; grid-template-columns: 1fr 540px;">
+
+    <!-- ─────────────────────────────────── lado da mensagem ── -->
+    <div style="position: relative; padding: 52px 0 0 64px; display: flex; flex-direction: column; overflow: hidden;">
+
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <svg width="24" height="24" viewBox="0 0 22 22" fill="none"><rect x="1" y="6" width="4" height="10" rx="2" fill="#FFFFFF"></rect><rect x="7" y="2" width="4" height="18" rx="2" fill="#FFFFFF"></rect><rect x="13" y="5" width="4" height="12" rx="2" fill="#FFC700"></rect><rect x="19" y="8" width="3" height="6" rx="1.5" fill="#FFFFFF" opacity="0.35"></rect></svg>
+        <span style="font-size: 19px; font-weight: 700; letter-spacing: -0.022em;">varvid</span>
+      </div>
+
+      <div style="margin-top: 58px; display: flex; flex-direction: column; gap: 22px; max-width: 620px;">
+        <h1 style="margin: 0; font-size: 72px; font-weight: 700; letter-spacing: -0.038em; line-height: 1; text-wrap: pretty;">
+          <span style="display: block; color: #FFFFFF;">Um take.</span>
+          <span style="display: block; color: #FFC700;">Trinta criativos.</span>
+          <span style="display: block; color: #6B7480;">Em minutos.</span>
+        </h1>
+        <p style="margin: 0; font-size: 17px; line-height: 1.62; color: #9AA3AF; max-width: 470px;">Suba seus blocos — hook, story, CTA — e o varvid monta todas as combinações, cada arquivo com assinatura própria. Você baixa tudo pronto para postar.</p>
+
+        <div style="display: flex; align-items: center; gap: 10px; margin-top: 2px;">
+          <span style="font-size: 12.5px; font-weight: 500; color: #101318; background: #FFC700; border-radius: 999px; padding: 7px 15px;">10 vídeos grátis</span>
+          <span style="font-size: 12.5px; color: #9AA3AF; border: 1px solid #232A33; border-radius: 999px; padding: 7px 15px;">nada para instalar</span>
+          <span style="font-size: 12.5px; color: #9AA3AF; border: 1px solid #232A33; border-radius: 999px; padding: 7px 15px;">cancele quando quiser</span>
+        </div>
+      </div>
+
+      <!-- ── o leque: um vídeo que virou muitos ── -->
+      <div style="position: absolute; left: 56px; bottom: -104px; width: 920px; height: 460px; perspective: 1500px;">
+        <div style="position: absolute; inset: 0; transform-style: preserve-3d; transform: rotateY(-26deg) rotateX(12deg);">
+
+          <div style="position: absolute; left: 516px; top: 96px; transform: translateZ(-430px);">
+            <div class="vv-carta" style="animation-delay: 1.5s;"><div style="width: 154px; height: 274px; border-radius: 16px; background: linear-gradient(165deg, #161B21 0%, #0E1216 100%); border: 1px solid #1E252E;"></div></div>
+          </div>
+          <div style="position: absolute; left: 430px; top: 80px; transform: translateZ(-344px);">
+            <div class="vv-carta" style="animation-delay: 1.25s;"><div style="width: 154px; height: 274px; border-radius: 16px; background: linear-gradient(165deg, #171D24 0%, #0F1418 100%); border: 1px solid #212932;"></div></div>
+          </div>
+          <div style="position: absolute; left: 344px; top: 64px; transform: translateZ(-258px);">
+            <div class="vv-carta" style="animation-delay: 1s;">
+              <div style="width: 154px; height: 274px; border-radius: 16px; background: linear-gradient(165deg, #192028 0%, #10161B 100%); border: 1px solid #242D37; display: flex; align-items: flex-end; padding: 12px;">
+                <span style="font-family: ui-monospace, monospace; font-size: 9.5px; color: #5A6472;">v04</span>
+              </div>
+            </div>
+          </div>
+          <div style="position: absolute; left: 258px; top: 48px; transform: translateZ(-172px);">
+            <div class="vv-carta" style="animation-delay: 0.75s;">
+              <div style="width: 154px; height: 274px; border-radius: 16px; background: linear-gradient(165deg, #1B232C 0%, #11181E 100%); border: 1px solid #27313C; display: flex; align-items: flex-end; padding: 12px;">
+                <span style="font-family: ui-monospace, monospace; font-size: 9.5px; color: #6B7480;">v03</span>
+              </div>
+            </div>
+          </div>
+          <div style="position: absolute; left: 172px; top: 32px; transform: translateZ(-86px);">
+            <div class="vv-carta" style="animation-delay: 0.5s;">
+              <div style="width: 154px; height: 274px; border-radius: 16px; background: linear-gradient(165deg, #1E2730 0%, #131A21 100%); border: 1px solid #2B3742; display: flex; align-items: flex-end; justify-content: space-between; padding: 12px;">
+                <span style="font-family: ui-monospace, monospace; font-size: 9.5px; color: #7C8593;">v02</span>
+                <span style="font-family: ui-monospace, monospace; font-size: 9.5px; color: #7C8593;">0:37</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- o original, na frente -->
+          <div style="position: absolute; left: 86px; top: 16px;">
+            <div class="vv-carta" style="animation-delay: 0.25s;">
+              <div style="position: relative; width: 154px; height: 274px; border-radius: 16px; background: linear-gradient(165deg, #232E39 0%, #151D25 100%); border: 1px solid #3A4652; overflow: hidden; box-shadow: 0 30px 60px rgba(0, 0, 0, 0.5);">
+                <div style="position: absolute; left: 0; right: 0; top: 0; height: 40%; background: linear-gradient(180deg, rgba(255, 199, 0, 0) 0%, rgba(255, 199, 0, 0.22) 50%, rgba(255, 199, 0, 0) 100%); animation: vv-varrer 4.2s ease-in-out infinite;"></div>
+                <div style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;">
+                  <span style="width: 44px; height: 44px; border-radius: 50%; background: #FFC700; display: flex; align-items: center; justify-content: center;">
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="#101318" style="margin-left: 3px;"><polygon points="6 4 20 12 6 20 6 4"></polygon></svg>
+                  </span>
+                </div>
+                <span style="position: absolute; left: 12px; top: 12px; font-family: ui-monospace, monospace; font-size: 9.5px; color: #101318; background: #FFC700; border-radius: 4px; padding: 3px 7px;">original</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─────────────────────────────────────── lado do acesso ── -->
+    <div style="position: relative; padding: 40px 56px; display: flex; flex-direction: column; justify-content: center; gap: 20px;">
+
+      <div style="position: absolute; left: 0; top: 0; bottom: 0; width: 1px; background: linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.1) 45%, rgba(255, 255, 255, 0) 100%);"></div>
+
+      <div style="background: linear-gradient(180deg, #151A20 0%, #101419 100%); border: 1px solid #212932; border-radius: 18px; padding: 30px; display: flex; flex-direction: column; gap: 18px; box-shadow: 0 40px 90px rgba(0, 0, 0, 0.55);">
+
+        <div style="display: flex; flex-direction: column; gap: 4px;">
+          <h2 style="margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.028em; color: #FFFFFF;">Entrar no varvid</h2>
+          <span style="font-size: 13px; color: #98A1AC;">Bem-vindo de volta — vamos criar.</span>
+        </div>
+
+        <button style="font-family: inherit; width: 100%; height: 46px; font-size: 13.5px; font-weight: 500; color: #C6CDD6; background: #151A20; border: 1px solid #212932; border-radius: 9px; display: flex; align-items: center; justify-content: center; gap: 10px; cursor: pointer;">
+          <svg width="16" height="16" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.6l6.7-6.7C35.6 2.4 30.1 0 24 0 14.6 0 6.4 5.4 2.5 13.3l7.8 6.1C12.2 13.7 17.6 9.5 24 9.5z"></path><path fill="#4285F4" d="M46.1 24.6c0-1.6-.1-3.1-.4-4.6H24v9.1h12.4c-.5 2.9-2.1 5.3-4.6 7l7.1 5.5c4.2-3.9 6.6-9.6 6.6-16.4z"></path><path fill="#FBBC05" d="M10.3 28.6c-.5-1.4-.8-3-.8-4.6s.3-3.2.8-4.6l-7.8-6.1C.9 16.3 0 20 0 24s.9 7.7 2.5 10.7l7.8-6.1z"></path><path fill="#34A853" d="M24 48c6.1 0 11.3-2 15-5.5l-7.1-5.5c-2 1.3-4.5 2.1-7.9 2.1-6.4 0-11.8-4.2-13.7-9.9l-7.8 6.1C6.4 42.6 14.6 48 24 48z"></path></svg>
+          Continuar com Google
+        </button>
+
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <span style="flex-grow: 1; height: 1px; background: #212932;"></span>
+          <span style="font-size: 11.5px; color: #6C7681;">ou</span>
+          <span style="flex-grow: 1; height: 1px; background: #212932;"></span>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 13px;">
+          <div style="display: flex; flex-direction: column; gap: 6px;">
+            <label style="font-size: 12px; font-weight: 500; color: #98A1AC;">E-mail</label>
+            <div style="height: 46px; background: #0F1318; border: 1px solid #212932; border-radius: 9px; display: flex; align-items: center; padding: 0 13px; font-size: 13.5px; color: #C6CDD6;">vinicius@omnisblue.com.br</div>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 6px;">
+            <div style="display: flex; align-items: baseline; justify-content: space-between;">
+              <label style="font-size: 12px; font-weight: 500; color: #98A1AC;">Senha</label>
+              <a style="font-size: 11.5px; text-decoration: none; color: #98A1AC;">Esqueci minha senha</a>
+            </div>
+            <div style="height: 46px; background: #0F1318; border: 1.5px solid #FFC700; border-radius: 9px; display: flex; align-items: center; justify-content: space-between; padding: 0 13px; font-size: 13.5px;">
+              <span style="letter-spacing: 0.14em; color: #98A1AC;">••••••••••</span>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8A93A0" stroke-width="1.7"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+            </div>
+          </div>
+        </div>
+
+        <button style="font-family: inherit; width: 100%; height: 50px; font-size: 15px; font-weight: 600; color: #101318; background: linear-gradient(180deg, #FFC700 0%, #FFD336 100%); border: none; border-radius: 9px; display: flex; align-items: center; justify-content: center; gap: 9px; cursor: pointer;">
+          Entrar
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+        </button>
+
+        <div style="font-size: 13px; color: #5B6470; text-align: center;">Não tem conta? <a style="font-weight: 600; text-decoration: none;">Criar conta grátis</a></div>
+      </div>
+
+      <div style="font-size: 11.5px; line-height: 1.6; color: #6B7480; text-align: center;">Ao continuar você concorda com os <a style="color: #9AA3AF; text-decoration: underline;">Termos de Uso</a> e a <a style="color: #9AA3AF; text-decoration: underline;">Política de Privacidade</a>.<br>varvid.com.br</div>
+    </div>
+  </div>
+</div>
+</div>
+</body>
+</html>

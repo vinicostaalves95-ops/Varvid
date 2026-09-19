@@ -228,7 +228,58 @@ A.cobrar_entregues('j6', j)
 check('erro com entrega parcial cobra o que saiu', BANCO['uc']['credits'] == 98,
       BANCO['uc']['credits'])
 
-print("\n[14] Conferir saldo não é cobrar")
+print("\n[14] Gerar de novo no mesmo job é uma cobrança NOVA")
+# O bug: a tela reaproveita o job_id quando a pessoa muda a quantidade e clica
+# em GERAR outra vez. O /generate reescrevia o registro por cima mas deixava a
+# marca `cobrado` de pé — e o selo que impede cobrar duas vezes pela MESMA
+# entrega acabava isentando a entrega SEGUINTE. Medido no app rodando: gerar 3,
+# trocar pra 4 e gerar de novo custava 3 créditos no total em vez de 7.
+perfil('uc', credits=100, renova_em=None)
+j = job('r1', completed=3, count_requested=3)
+A.cobrar_entregues('r1', j)
+check('1ª rodada: 3 entregues cobram 3', BANCO['uc']['credits'] == 97,
+      BANCO['uc']['credits'])
+
+A.preparar_nova_rodada(j, 4, '', 3)
+check('a marca de cobrança não atravessa a rodada', not j.get('cobrado'), j.get('cobrado'))
+j['status'] = 'done'; j['completed'] = 4
+A.save_job('r1', j)
+A.cobrar_entregues('r1', j)
+check('2ª rodada no MESMO job cobra os 4', BANCO['uc']['credits'] == 93,
+      BANCO['uc']['credits'])
+
+# O caminho que mais doía: uma geração que falha sem entregar nada também marca
+# `cobrado` (certo, não se cobra por nada). Com a marca sobrevivendo, quem batia
+# num erro e tentava de novo na mesma tela nunca pagava.
+perfil('uc', credits=100, renova_em=None)
+j = job('r2', status='error', completed=0, count_requested=5)
+A.cobrar_entregues('r2', j)
+check('rodada que falhou não cobra', BANCO['uc']['credits'] == 100, BANCO['uc']['credits'])
+A.preparar_nova_rodada(j, 5, '', 3)
+j['status'] = 'done'; j['completed'] = 5
+A.save_job('r2', j)
+A.cobrar_entregues('r2', j)
+check('a tentativa seguinte NÃO sai de graça', BANCO['uc']['credits'] == 95,
+      BANCO['uc']['credits'])
+
+# Dentro de uma mesma rodada o selo continua valendo: /status bate a cada 1,5s
+# e o Modal também avisa — os dois chamam cobrar_entregues.
+A.cobrar_entregues('r2', A.load_job('r2'))
+A.cobrar_entregues('r2', A.load_job('r2'))
+check('dentro da rodada, o selo segue impedindo cobrança dupla',
+      BANCO['uc']['credits'] == 95, BANCO['uc']['credits'])
+
+# Sobra de rodada anterior que confundiria a tela nova.
+j = job('r3', completed=2, error='deu ruim', takes_map={'hook': ['a.mp4']})
+A.preparar_nova_rodada(j, 6, 'oi', 4)
+check('erro antigo some no reset', 'error' not in j, j.get('error'))
+check('contagem pedida vira a nova', j['count_requested'] == 6, j['count_requested'])
+check('volta pra fila zerado',
+      j['status'] == 'queued' and j['completed'] == 0 and j['files'] == [],
+      (j['status'], j['completed'], j['files']))
+
+
+print("\n[15] Conferir saldo não é cobrar")
 perfil('uc', credits=10, renova_em=None)
 podeok, saldo, err = A.tem_creditos('uc', 5)
 check('tem saldo: deixa passar', podeok is True and err is None, (podeok, err))

@@ -17,6 +17,7 @@ import os
 import re
 import json
 import uuid
+import hashlib
 import random
 import shutil
 import errno
@@ -310,7 +311,8 @@ def _sb_rest(method, path, body=None):
     raise last
 
 
-PERFIL_CAMPOS = 'credits,plan,ciclo,renova_em,stripe_subscription_id,stripe_customer_id'
+PERFIL_CAMPOS = ('credits,plan,ciclo,renova_em,stripe_subscription_id,'
+                 'stripe_customer_id,referral_code,referred_by,ref_ativou,ref_pagou')
 
 
 def get_or_create_profile(uid, email=None):
@@ -550,7 +552,248 @@ def cobrar_entregues(job_id, j):
     save_job(job_id, j)
     print('[CREDITS] job %s: %d entregue(s), %d cobrado(s), restam %s'
           % (job_id, entregues, cobrar, restantes))
+    # Entregou vídeo = a pessoa ativou. É aqui que o primeiro bônus de quem a
+    # indicou nasce — e não no cadastro, que é grátis e infinito.
+    resolver_indicacao(uid, 'ativacao')
     return j
+
+
+# Campos que pertencem a UMA rodada e não podem atravessar para a próxima.
+# `cobrado` está aqui porque é o selo que impede cobrar duas vezes pela mesma
+# entrega — dentro de uma rodada ele é essencial, entre rodadas ele é um furo.
+MARCAS_DA_RODADA = ('cobrado', 'cobrado_creditos', 'error', 'takes_map')
+
+
+def preparar_nova_rodada(job, count, headline_text, headline_duration):
+    """Deixa o registro do job pronto para uma NOVA geração cobrável.
+
+    A tela reaproveita o mesmo job_id quando a pessoa muda a quantidade e clica
+    em GERAR de novo — não é preciso subir os takes outra vez. O registro então
+    é reescrito por cima, e é aí que morava o bug: o reset zerava arquivos,
+    contagem, status e progresso, mas deixava `cobrado` de pé. A marca da rodada
+    anterior valia para a rodada nova, e a segunda geração saía de graça.
+
+    Pior no caminho do erro: uma geração que falha sem entregar nada também
+    marca `cobrado` (certo — não se cobra por nada). Com a marca sobrevivendo,
+    quem batia num erro e tentava de novo na mesma tela nunca pagava.
+
+    Cada GERAR é um evento de cobrança próprio. Esta função é o único lugar que
+    abre um, e é ela que garante que ele comece limpo.
+    """
+    for marca in MARCAS_DA_RODADA:
+        job.pop(marca, None)
+    job.update({'status': 'queued', 'files': [], 'completed': 0,
+                'count_requested': count, 'headline_text': headline_text,
+                'headline_duration': headline_duration, 'takes_map': {},
+                'progress': 0,
+                'created_at': time.time()})   # base do "job travado" (JOB_STALE_MINUTES)
+    return job
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  MEMBER GET MEMBER
+#
+#  Desenho, e por que ele é assim:
+#
+#  · Os DOIS lados ganham. Premiar só quem indica transforma o link num pedido
+#    de favor; o indicado não tem motivo nenhum pra usá-lo.
+#
+#  · O bônus de quem indica é PARTIDO em dois momentos. A primeira parte cai
+#    quando o indicado GERA pela primeira vez — não quando ele se cadastra.
+#    Cadastro é grátis e infinito: um e-mail novo já vale os créditos do free, e
+#    pagar indicação em cima disso seria imprimir crédito. Gerar exige arquivo de
+#    vídeo de verdade e queima render, o que não escala pra quem quer fraudar.
+#    A segunda parte, a maior, só sai quando o indicado ASSINA — aí entrou
+#    dinheiro, e o prêmio se paga sozinho.
+#
+#  · Tem teto. O Dropbox, o caso mais citado desse tipo de programa, também
+#    tinha (16 GB). E a moeda deles era armazenamento parado; a nossa é render
+#    no Modal mais tráfego no R2 — custo real, na hora em que o crédito é usado.
+#
+#  · As marcas de "já paguei" ficam na linha de QUEM FOI INDICADO, não na de
+#    quem indicou. Cada indicado dispara cada bônus uma vez só, e a marca fica
+#    colada no evento. Um contador no indicador daria o mesmo número e perderia
+#    a origem — e selo no lugar errado foi exatamente o bug de cobrança de 19/09.
+# ══════════════════════════════════════════════════════════════════════════════
+
+REF_BONUS_ATIVACAO = int(os.environ.get('VARVID_REF_ATIVACAO', '5'))
+REF_BONUS_PAGO = int(os.environ.get('VARVID_REF_PAGO', '15'))
+REF_BONUS_INDICADO = int(os.environ.get('VARVID_REF_INDICADO', '10'))
+REF_TETO = int(os.environ.get('VARVID_REF_TETO', '5'))
+
+
+def codigo_de_indicacao(uid):
+    """Código público de quem indica. Derivado do id, então é sempre o mesmo.
+
+    Sortear exigiria conferir colisão e gravar antes de poder mostrar. Derivar
+    torna a função idempotente: pode ser chamada mil vezes, dá o mesmo resultado,
+    e nunca existe um usuário "ainda sem código".
+
+    Não dá pra voltar ao id a partir dele (é hash), então publicar o código no
+    link não expõe o identificador do usuário.
+    """
+    return hashlib.sha1(('varvid-ref:' + str(uid)).encode()).hexdigest()[:8].upper()
+
+
+def _somar_creditos(uid, quantos, motivo):
+    """Soma crédito no saldo de alguém. Nunca substitui.
+
+    (Lê e grava em duas etapas, como o resto do arquivo. Duas somas no mesmo
+    milissegundo para o MESMO usuário perderiam uma — na prática não acontece
+    aqui, porque cada bônus dispara uma vez só por indicado. O lugar certo de
+    resolver isso de vez é uma função no Postgres somando atomicamente.)
+    """
+    if quantos <= 0:
+        return False
+    try:
+        rows = _sb_rest('GET', 'profiles?id=eq.%s&select=credits' % uid)
+        atual = int((rows[0].get('credits') if rows else 0) or 0)
+        _sb_rest('PATCH', 'profiles?id=eq.%s' % uid, {'credits': atual + quantos})
+        print('[REF] %s: +%d credito(s) (%s)' % (uid, quantos, motivo))
+        return True
+    except Exception as e:
+        print('[REF] erro ao creditar %s: %s' % (uid, e))
+        return False
+
+
+def _perfil_do_codigo(codigo):
+    """Quem é o dono deste código. None se não existir."""
+    try:
+        rows = _sb_rest('GET', 'profiles?referral_code=eq.%s&select=id,referral_code'
+                        % codigo)
+        return rows[0] if rows else None
+    except Exception as e:
+        print('[REF] erro ao buscar codigo %s: %s' % (codigo, e))
+        return None
+
+
+def garantir_codigo(uid, prof):
+    """Grava o código no perfil se ainda não estiver lá. Devolve o código."""
+    codigo = codigo_de_indicacao(uid)
+    if not prof or prof.get('referral_code') == codigo:
+        return codigo
+    try:
+        _sb_rest('PATCH', 'profiles?id=eq.%s' % uid, {'referral_code': codigo})
+    except Exception as e:
+        print('[REF] erro ao gravar codigo de %s: %s' % (uid, e))
+    return codigo
+
+
+def registrar_indicacao(uid, codigo):
+    """Vincula quem acabou de entrar a quem o trouxe. Devolve (ok, motivo).
+
+    Grava UMA vez. Depois de gravado, nem o dono muda — senão bastaria chamar o
+    endpoint de novo com outro código pra trocar de padrinho, ou pra pegar o
+    bônus do indicado repetidas vezes.
+    """
+    if not (CREDITS_ENABLED and codigo):
+        return False, 'desligado'
+    codigo = str(codigo).strip().upper()
+    if codigo == codigo_de_indicacao(uid):
+        return False, 'auto_indicacao'        # indicar a si mesmo não vale
+    dono = _perfil_do_codigo(codigo)
+    if not dono:
+        return False, 'codigo_invalido'
+    prof = get_or_create_profile(uid)
+    if prof is None:
+        return False, 'db_indisponivel'
+    if prof.get('referred_by'):
+        return False, 'ja_indicado'
+    try:
+        _sb_rest('PATCH', 'profiles?id=eq.%s' % uid, {'referred_by': codigo})
+    except Exception as e:
+        print('[REF] erro ao vincular %s a %s: %s' % (uid, codigo, e))
+        return False, 'db_indisponivel'
+    # O bônus do INDICADO sai agora: é o que dá motivo pra ele usar o link.
+    # Ele não é farmável de graça porque exige uma conta nova, e conta nova já
+    # custa o free — o teto de quem indica é que segura o volume.
+    _somar_creditos(uid, REF_BONUS_INDICADO, 'entrou por indicacao de ' + codigo)
+    return True, None
+
+
+def _indicacoes_validas(codigo):
+    """Quantos indicados deste código já contaram para o teto."""
+    try:
+        rows = _sb_rest('GET', 'profiles?referred_by=eq.%s&ref_ativou=is.true&select=id'
+                        % codigo)
+        return len(rows or [])
+    except Exception as e:
+        print('[REF] erro ao contar indicacoes de %s: %s' % (codigo, e))
+        return REF_TETO        # na dúvida não paga: erro de rede não vira crédito
+
+
+def resolver_indicacao(uid, etapa):
+    """Paga quem indicou este usuário, na etapa dada ('ativacao' ou 'pago').
+
+    Sem efeito quando a etapa já foi paga, quando ninguém o indicou, ou quando o
+    padrinho já estourou o teto. Pode ser chamada à vontade.
+    """
+    if not CREDITS_ENABLED:
+        return
+    try:
+        prof = get_or_create_profile(uid)
+        if not prof:
+            return
+        codigo = prof.get('referred_by')
+        if not codigo:
+            return
+        dono = _perfil_do_codigo(codigo)
+        if not dono:
+            return
+        padrinho = dono.get('id')
+
+        if etapa == 'ativacao':
+            if prof.get('ref_ativou'):
+                return
+            if _indicacoes_validas(codigo) >= REF_TETO:
+                print('[REF] %s no teto (%d) — indicacao de %s nao paga'
+                      % (codigo, REF_TETO, uid))
+                return
+            # Marca ANTES de creditar: se o crédito falhar, a próxima passada
+            # tentaria de novo e poderia pagar duas vezes. Um bônus perdido por
+            # falha de rede é bem menos grave que um bônus pago em dobro.
+            _sb_rest('PATCH', 'profiles?id=eq.%s' % uid, {'ref_ativou': True})
+            _somar_creditos(padrinho, REF_BONUS_ATIVACAO,
+                            'indicado %s gerou pela 1a vez' % uid)
+            return
+
+        if etapa == 'pago':
+            if prof.get('ref_pagou'):
+                return
+            # Quem assina sem nunca ter gerado ainda não passou pelo teto. Passa
+            # agora: sem isto, pagar antes de gerar deixaria o padrinho sem os
+            # dois bônus, que é o contrário do que o programa promete.
+            if not prof.get('ref_ativou'):
+                if _indicacoes_validas(codigo) >= REF_TETO:
+                    return
+                _sb_rest('PATCH', 'profiles?id=eq.%s' % uid, {'ref_ativou': True})
+                _somar_creditos(padrinho, REF_BONUS_ATIVACAO,
+                                'indicado %s assinou (ativacao junto)' % uid)
+            _sb_rest('PATCH', 'profiles?id=eq.%s' % uid, {'ref_pagou': True})
+            _somar_creditos(padrinho, REF_BONUS_PAGO,
+                            'indicado %s assinou um plano pago' % uid)
+    except Exception as e:
+        # Indicação nunca pode derrubar a geração nem a assinatura de quem está
+        # na frente da tela. Falhou, fica sem o bônus e o log conta.
+        print('[REF] erro ao resolver indicacao de %s (%s): %s' % (uid, etapa, e))
+
+
+def resumo_indicacoes(uid, prof):
+    """O que a tela mostra: o código, quantos entraram e quantos já renderam."""
+    codigo = garantir_codigo(uid, prof)
+    entraram = ativaram = pagaram = 0
+    try:
+        rows = _sb_rest('GET', 'profiles?referred_by=eq.%s&select=ref_ativou,ref_pagou'
+                        % codigo) or []
+        entraram = len(rows)
+        ativaram = len([r for r in rows if r.get('ref_ativou')])
+        pagaram = len([r for r in rows if r.get('ref_pagou')])
+    except Exception as e:
+        print('[REF] erro no resumo de %s: %s' % (uid, e))
+    return {'codigo': codigo, 'entraram': entraram, 'ativaram': ativaram,
+            'pagaram': pagaram, 'teto': REF_TETO,
+            'bonusAtivacao': REF_BONUS_ATIVACAO, 'bonusPago': REF_BONUS_PAGO,
+            'bonusIndicado': REF_BONUS_INDICADO}
 
 
 def set_plan(uid, plan, ciclo='mensal', extra=None):
@@ -577,6 +820,10 @@ def set_plan(uid, plan, ciclo='mensal', extra=None):
         patch.update(extra)
     try:
         _sb_rest('PATCH', 'profiles?id=eq.%s' % uid, patch)
+        # Assinou um plano pago: entrou dinheiro, e é aqui que sai o bônus
+        # maior de quem trouxe esta pessoa.
+        if plan in PLANS_PAGOS:
+            resolver_indicacao(uid, 'pago')
         return True
     except Exception as e:
         print('[STRIPE] erro ao definir plano:', e)
@@ -1864,6 +2111,38 @@ def me():
     return jsonify(out)
 
 
+@app.route('/indicacao')
+def indicacao_resumo():
+    """Dados do programa de indicação. Endpoint próprio, e não dentro do /me,
+    porque o /me é consultado o tempo todo e isto custa duas idas ao banco."""
+    uid = current_user_id()
+    if AUTH_ENABLED and not uid:
+        return jsonify({'error': 'unauthorized'}), 401
+    if not CREDITS_ENABLED:
+        return jsonify({'ativo': False})
+    prof = get_or_create_profile(uid, current_user_email())
+    out = resumo_indicacoes(uid, prof)
+    out['ativo'] = True
+    return jsonify(out)
+
+
+@app.route('/indicacao/registrar', methods=['POST'])
+def indicacao_registrar():
+    """Vincula quem acabou de entrar ao código de quem o trouxe.
+
+    Chamado pela tela no primeiro acesso depois do cadastro. Recusar em silêncio
+    é o comportamento certo aqui: código inválido, código próprio ou pessoa que
+    já tem padrinho não são erros que valham interromper quem está entrando.
+    """
+    uid = current_user_id()
+    if AUTH_ENABLED and not uid:
+        return jsonify({'error': 'unauthorized'}), 401
+    codigo = ((request.json or {}).get('codigo') or '').strip()
+    ok, motivo = registrar_indicacao(uid, codigo)
+    return jsonify({'ok': ok, 'motivo': motivo,
+                    'ganhou': REF_BONUS_INDICADO if ok else 0})
+
+
 @app.route('/billing/plans')
 def billing_plans():
     uid = current_user_id()
@@ -2166,10 +2445,9 @@ def generate():
     shutil.rmtree(out_dir, ignore_errors=True)
     os.makedirs(out_dir, exist_ok=True)
 
-    job.update({'status': 'queued', 'files': [], 'completed': 0,
-                'count_requested': count, 'headline_text': headline_text,
-                'headline_duration': headline_duration, 'takes_map': {}, 'progress': 0,
-                'created_at': time.time()})   # base do "job travado" (JOB_STALE_MINUTES)
+    # Abre uma rodada NOVA: limpa inclusive as marcas de cobrança da anterior.
+    # Sem isso, o selo antifraude da rodada passada isentava a rodada atual.
+    preparar_nova_rodada(job, count, headline_text, headline_duration)
     save_job(job_id, job)
 
     if MODAL_ENABLED:

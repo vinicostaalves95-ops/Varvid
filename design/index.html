@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>varvid — design</title>
+<link rel="icon" href="favicon.svg">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap">
+<style>
+  :root {
+    --grafite: #101318; --amarelo: #FFC700; --fundo: #F2F3F5;
+    --linha: #E3E6EA; --linha2: #EBEEF1; --t2: #4A525E; --t3: #5B6470; --t4: #8A93A0;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--fundo); color: var(--grafite);
+    font-family: 'Poppins', system-ui, sans-serif; }
+  .topo { background: #0A0D11; color: #fff; padding: 40px 40px 54px; position: relative; overflow: hidden; }
+  .topo::after { content: ''; position: absolute; right: -120px; top: -200px; width: 600px; height: 600px;
+    border-radius: 50%; background: radial-gradient(circle, rgba(255,199,0,.13) 0%, rgba(255,199,0,0) 66%); }
+  .marca { display: flex; align-items: center; gap: 10px; position: relative; }
+  .marca span { font-size: 18px; font-weight: 700; letter-spacing: -.022em; }
+  h1 { position: relative; margin: 32px 0 10px; font-size: 38px; font-weight: 700; letter-spacing: -.03em; line-height: 1.1; }
+  h1 em { font-style: normal; color: #6B7480; }
+  .sub { position: relative; margin: 0; font-size: 15px; line-height: 1.6; color: #9AA3AF; max-width: 620px; }
+  main { padding: 28px 40px 56px; }
+  h2 { font-size: 10.5px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--t4); margin: 32px 0 14px; }
+  h2:first-child { margin-top: 0; }
+  .grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+  a.tela { display: flex; align-items: center; gap: 13px; text-decoration: none; color: inherit;
+    background: #fff; border: 1px solid var(--linha); border-radius: 12px; padding: 15px 16px; }
+  a.tela:hover { border-color: var(--grafite); }
+  .num { font-family: ui-monospace, monospace; font-size: 11px; color: var(--grafite);
+    background: var(--amarelo); border-radius: 6px; padding: 4px 8px; flex-shrink: 0; }
+  .num.cinza { background: #E9EDF2; color: var(--t3); }
+  .nome { font-size: 13.5px; font-weight: 500; line-height: 1.3; }
+  .nota { font-size: 11px; color: var(--t4); margin-top: 2px; }
+  .destaque { background: linear-gradient(180deg, #FFFCF0 0%, #fff 46%); border: 1px solid #F0DC93;
+    border-radius: 14px; padding: 18px 20px; display: flex; align-items: center;
+    justify-content: space-between; gap: 20px; margin-bottom: 28px; }
+  .destaque p { margin: 0; font-size: 13.5px; line-height: 1.6; color: var(--t2); max-width: 620px; }
+  .destaque a { font-size: 13.5px; font-weight: 600; color: var(--grafite); background: var(--amarelo);
+    border-radius: 9px; padding: 12px 20px; text-decoration: none; flex-shrink: 0; }
+  footer { border-top: 1px solid var(--linha); margin-top: 40px; padding-top: 22px;
+    font-size: 12px; line-height: 1.7; color: var(--t4); }
+  @media (max-width: 640px) {
+    .topo { padding: 28px 20px 38px; } main { padding: 24px 20px 44px; }
+    h1 { font-size: 28px; } .destaque { flex-direction: column; align-items: flex-start; }
+  }
+</style>
+</head>
+<body>
+
+<div class="topo">
+  <div class="marca">
+    <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><rect x="1" y="6" width="4" height="10" rx="2" fill="#fff"/><rect x="7" y="2" width="4" height="18" rx="2" fill="#fff"/><rect x="13" y="5" width="4" height="12" rx="2" fill="#FFC700"/><rect x="19" y="8" width="3" height="6" rx="1.5" fill="#fff" opacity=".35"/></svg>
+    <span>varvid</span>
+  </div>
+  <h1>Design do varvid<br><em>duas versões, mesma linguagem</em></h1>
+  <p class="sub">A <strong>escura</strong> mantém a arquitetura que já está no Render e traz o fade, as superfícies e a marca nova. A <strong>clara</strong> é a direção Console, com menu lateral. Cada tela abre sozinha.</p>
+</div>
+
+<main>
+  <div class="destaque">
+    <p><strong>O canvas completo</strong> — as duas versões lado a lado, com as anotações de decisão e as direções de marca. É o melhor lugar para comparar.</p>
+    <a href="varvid-identidade-visual.html">Abrir o canvas</a>
+  </div>
+
+  <h2>Escura — a versão de hoje, limpa</h2>
+  <div class="grade">
+    <a class="tela" href="telas/noite-01-login.html"><span class="num">01</span><span><span class="nome">Login</span><span class="nota">o leque 3D, cartão escuro</span></span></a>
+    <a class="tela" href="telas/noite-02-inicio.html"><span class="num">02</span><span><span class="nome">Início</span><span class="nota">escolha do modo e últimas gerações</span></span></a>
+    <a class="tela" href="telas/noite-03-remix-antes.html"><span class="num">03</span><span><span class="nome">Remix — antes</span><span class="nota">área de arrastar e o guia em destaque</span></span></a>
+    <a class="tela" href="telas/noite-04-remix-com-takes.html"><span class="num">04</span><span><span class="nome">Remix — com os takes</span><span class="nota">estrutura reconhecida</span></span></a>
+    <a class="tela" href="telas/noite-05-video-unico.html"><span class="num">05</span><span><span class="nome">Vídeo único</span><span class="nota">estado vazio</span></span></a>
+    <a class="tela" href="telas/noite-06-gerando.html"><span class="num">06</span><span><span class="nome">Gerando</span><span class="nota">prontos já baixáveis</span></span></a>
+    <a class="tela" href="telas/noite-07-resultados.html"><span class="num">07</span><span><span class="nome">Resultados</span><span class="nota">grade de 15</span></span></a>
+    <a class="tela" href="telas/noite-08-creditos-esgotados.html"><span class="num">08</span><span><span class="nome">Créditos esgotados</span><span class="nota">aviso colado no botão</span></span></a>
+    <a class="tela" href="telas/noite-09-popup-planos.html"><span class="num">09</span><span><span class="nome">Pop-up de planos</span></span></a>
+    <a class="tela" href="telas/noite-10-popup-legal.html"><span class="num">10</span><span><span class="nome">Pop-up legal</span></span></a>
+    <a class="tela" href="telas/noite-11-como-funciona.html"><span class="num">11</span><span><span class="nome">Como funciona</span><span class="nota">aberta, antes do login</span></span></a>
+    <a class="tela" href="telas/noite-12-roteiro-pronto.html"><span class="num">12</span><span><span class="nome">Roteiro pronto</span><span class="nota">aberta, antes do login</span></span></a>
+  </div>
+
+  <h2>Clara — a direção Console</h2>
+  <div class="grade">
+    <a class="tela" href="telas/01-login.html"><span class="num">01</span><span><span class="nome">Login</span><span class="nota">a única escura, com o leque 3D</span></span></a>
+    <a class="tela" href="telas/02-inicio.html"><span class="num">02</span><span><span class="nome">Início</span><span class="nota">escolha do modo e consumo</span></span></a>
+    <a class="tela" href="telas/03-remix-antes-dos-arquivos.html"><span class="num">03</span><span><span class="nome">Remix — antes dos arquivos</span><span class="nota">área de arrastar e o guia de nomes</span></span></a>
+    <a class="tela" href="telas/04-remix-com-takes.html"><span class="num">04</span><span><span class="nome">Remix — com os takes</span><span class="nota">estrutura já reconhecida</span></span></a>
+    <a class="tela" href="telas/05-video-unico.html"><span class="num">05</span><span><span class="nome">Vídeo único</span><span class="nota">estado vazio</span></span></a>
+    <a class="tela" href="telas/06-gerando.html"><span class="num">06</span><span><span class="nome">Gerando</span><span class="nota">entradas travadas, prontos já baixáveis</span></span></a>
+    <a class="tela" href="telas/07-resultados.html"><span class="num">07</span><span><span class="nome">Resultados</span><span class="nota">grade de 15 em tela cheia</span></span></a>
+    <a class="tela" href="telas/08-creditos-esgotados.html"><span class="num">08</span><span><span class="nome">Créditos esgotados</span><span class="nota">o único bloco escuro do produto</span></span></a>
+    <a class="tela" href="telas/09-popup-planos.html"><span class="num">09</span><span><span class="nome">Pop-up de planos</span><span class="nota">plano vigente marcado</span></span></a>
+    <a class="tela" href="telas/10-popup-legal.html"><span class="num">10</span><span><span class="nome">Pop-up legal</span><span class="nota">campos pendentes em amarelo</span></span></a>
+  </div>
+
+  <h2>Clara — abertas, antes do login</h2>
+  <div class="grade">
+    <a class="tela" href="telas/11-como-funciona.html"><span class="num">11</span><span><span class="nome">Como funciona</span><span class="nota">a dor, a virada e os cinco blocos</span></span></a>
+    <a class="tela" href="telas/12-roteiro-pronto.html"><span class="num">12</span><span><span class="nome">Roteiro pronto</span><span class="nota">o prompt dentro do botão</span></span></a>
+  </div>
+
+  <h2>Marca</h2>
+  <div class="grade">
+    <a class="tela" href="telas/marca-console.html"><span class="num">C</span><span><span class="nome">Console — a escolhida</span><span class="nota">símbolo, paleta, tipografia, componentes</span></span></a>
+    <a class="tela" href="telas/arquivo-marca-oficio.html"><span class="num cinza">A</span><span><span class="nome">Ofício</span><span class="nota">arquivo</span></span></a>
+    <a class="tela" href="telas/arquivo-marca-sinal.html"><span class="num cinza">B</span><span><span class="nome">Sinal</span><span class="nota">arquivo</span></span></a>
+  </div>
+
+  <h2>Direções não escolhidas</h2>
+  <div class="grade">
+    <a class="tela" href="telas/arquivo-oficio-studio.html"><span class="num cinza">A</span><span><span class="nome">Ofício — Studio</span></span></a>
+    <a class="tela" href="telas/arquivo-oficio-login.html"><span class="num cinza">A</span><span><span class="nome">Ofício — Login</span></span></a>
+    <a class="tela" href="telas/arquivo-oficio-planos.html"><span class="num cinza">A</span><span><span class="nome">Ofício — Planos</span></span></a>
+    <a class="tela" href="telas/arquivo-sinal-studio.html"><span class="num cinza">B</span><span><span class="nome">Sinal — Studio</span></span></a>
+    <a class="tela" href="telas/arquivo-sinal-login.html"><span class="num cinza">B</span><span><span class="nome">Sinal — Login</span></span></a>
+    <a class="tela" href="telas/arquivo-sinal-planos.html"><span class="num cinza">B</span><span><span class="nome">Sinal — Planos</span></span></a>
+  </div>
+
+  <footer>
+    As telas foram desenhadas em 1440 × 900. Numa janela menor elas aparecem cortadas — é mockup de desktop, não layout responsivo.<br>
+    Os tokens de cor, tipografia e forma estão em <code>tokens.css</code>. As decisões e o que ficou pendente estão no <code>README.md</code>.
+  </footer>
+</main>
+
+</body>
+</html>

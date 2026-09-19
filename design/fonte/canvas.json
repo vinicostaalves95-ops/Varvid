@@ -1,0 +1,421 @@
+{
+  "pages": [
+    {
+      "id": "page-0",
+      "name": "Noite — produto"
+    },
+    {
+      "id": "page-1",
+      "name": "Console — claro"
+    },
+    {
+      "id": "page-2",
+      "name": "Marca"
+    },
+    {
+      "id": "page-3",
+      "name": "Direções não escolhidas"
+    }
+  ],
+  "artboards": [
+    {
+      "file": "NoiteLogin.dc.html",
+      "title": "01 · Login",
+      "page": "page-0",
+      "x": 0,
+      "y": 0,
+      "w": 1440,
+      "h": 900
+    },
+    {
+      "file": "NoiteInicio.dc.html",
+      "title": "02 · Início",
+      "page": "page-0",
+      "x": 1560,
+      "y": 0,
+      "w": 1440,
+      "h": 900
+    },
+    {
+      "file": "NoiteRemixVazio.dc.html",
+      "title": "03 · Remix — antes",
+      "page": "page-0",
+      "x": 3120,
+      "y": 0,
+      "w": 1440,
+      "h": 900
+    },
+    {
+      "file": "NoiteRemixCheio.dc.html",
+      "title": "04 · Remix — com os takes",
+      "page": "page-0",
+      "x": 0,
+      "y": 1140,
+      "w": 1440,
+      "h": 900
+    },
+    {
+      "file": "NoiteUnico.dc.html",
+      "title": "05 · Vídeo único",
+      "page": "page-0",
+      "x": 1560,
+      "y": 1140,
+      "w": 1440,
+      "h": 900
+    },
+    {
+      "file": "NoiteGerando.dc.html",
+      "title": "06 · Gerando",
+      "page": "page-0",
+      "x": 3120,
+      "y": 1140,
+      "w": 1440,
+      "h": 900
+    },
+    {
+      "file": "NoiteResultados.dc.html",
+      "title": "07 · Resultados",
+      "page": "page-0",
+      "x": 0,
+      "y": 2280,
+      "w": 1440,
+      "h": 900
+    },
+    {
+      "file": "NoiteSemCreditos.dc.html",
+      "title": "08 · Créditos esgotados",
+      "page": "page-0",
+      "x": 1560,
+      "y": 2280,
+      "w": 1440,
+      "h": 900
+    },
+    {
+      "file": "NoitePlanos.dc.html",
+      "title": "09 · Pop-up de planos",
+      "page": "page-0",
+      "x": 3120,
+      "y": 2280,
+      "w": 1040,
+      "h": 760
+    },
+    {
+      "file": "NoiteLegal.dc.html",
+      "title": "10 · Pop-up legal",
+      "page": "page-0",
+      "x": 0,
+      "y": 3420,
+      "w": 1040,
+      "h": 760
+    },
+    {
+      "file": "NoiteComoFunciona.dc.html",
+      "title": "11 · Como funciona",
+      "page": "page-0",
+      "x": 1280,
+      "y": 3420,
+      "w": 1440,
+      "h": 1560
+    },
+    {
+      "file": "NoiteRoteiro.dc.html",
+      "title": "12 · Roteiro pronto",
+      "page": "page-0",
+      "x": 2960,
+      "y": 3420,
+      "w": 1440,
+      "h": 1120
+    },
+    {
+      "file": "ConsoleLogin.dc.html",
+      "title": "01 · Login",
+      "page": "page-1",
+      "x": 0,
+      "y": 0,
+      "w": 1440,
+      "h": 900
+    },
+    {
+      "file": "ConsoleHome.dc.html",
+      "title": "02 · Início",
+      "page": "page-1",
+      "x": 1560,
+      "y": 0,
+      "w": 1440,
+      "h": 900
+    },
+    {
+      "file": "Main.dc.html",
+      "title": "03 · Remix — antes dos arquivos",
+      "page": "page-1",
+      "x": 3120,
+      "y": 0,
+      "w": 1440,
+      "h": 900
+    },
+    {
+      "file": "ConsoleRemixCheio.dc.html",
+      "title": "04 · Remix — com os takes",
+      "page": "page-1",
+      "x": 0,
+      "y": 1140,
+      "w": 1440,
+      "h": 900
+    },
+    {
+      "file": "ConsoleUnico.dc.html",
+      "title": "05 · Vídeo único",
+      "page": "page-1",
+      "x": 1560,
+      "y": 1140,
+      "w": 1440,
+      "h": 900
+    },
+    {
+      "file": "ConsoleGerando.dc.html",
+      "title": "06 · Gerando",
+      "page": "page-1",
+      "x": 3120,
+      "y": 1140,
+      "w": 1440,
+      "h": 900
+    },
+    {
+      "file": "ConsoleResultados.dc.html",
+      "title": "07 · Resultados",
+      "page": "page-1",
+      "x": 0,
+      "y": 2280,
+      "w": 1440,
+      "h": 900
+    },
+    {
+      "file": "ConsoleSemCreditos.dc.html",
+      "title": "08 · Créditos esgotados",
+      "page": "page-1",
+      "x": 1560,
+      "y": 2280,
+      "w": 1440,
+      "h": 900
+    },
+    {
+      "file": "ConsolePlanos.dc.html",
+      "title": "09 · Pop-up de planos",
+      "page": "page-1",
+      "x": 3120,
+      "y": 2280,
+      "w": 1040,
+      "h": 760
+    },
+    {
+      "file": "ConsoleLegal.dc.html",
+      "title": "10 · Pop-up legal",
+      "page": "page-1",
+      "x": 0,
+      "y": 3420,
+      "w": 1040,
+      "h": 760
+    },
+    {
+      "file": "MarcaConsole.dc.html",
+      "title": "C · Console (escolhida)",
+      "page": "page-2",
+      "x": 0,
+      "y": 0,
+      "w": 1240,
+      "h": 880
+    },
+    {
+      "file": "MarcaOficio.dc.html",
+      "title": "A · Ofício",
+      "page": "page-2",
+      "x": 1400,
+      "y": 0,
+      "w": 1240,
+      "h": 880
+    },
+    {
+      "file": "MarcaSinal.dc.html",
+      "title": "B · Sinal",
+      "page": "page-2",
+      "x": 2800,
+      "y": 0,
+      "w": 1240,
+      "h": 880
+    },
+    {
+      "file": "OficioStudio.dc.html",
+      "title": "A · Ofício — Studio",
+      "page": "page-3",
+      "x": 0,
+      "y": 0,
+      "w": 1440,
+      "h": 900
+    },
+    {
+      "file": "OficioLogin.dc.html",
+      "title": "A · Ofício — Login",
+      "page": "page-3",
+      "x": 1560,
+      "y": 0,
+      "w": 1440,
+      "h": 900
+    },
+    {
+      "file": "OficioPlanos.dc.html",
+      "title": "A · Ofício — Planos",
+      "page": "page-3",
+      "x": 3120,
+      "y": 0,
+      "w": 1040,
+      "h": 760
+    },
+    {
+      "file": "SinalStudio.dc.html",
+      "title": "B · Sinal — Studio",
+      "page": "page-3",
+      "x": 0,
+      "y": 1140,
+      "w": 1440,
+      "h": 900
+    },
+    {
+      "file": "SinalLogin.dc.html",
+      "title": "B · Sinal — Login",
+      "page": "page-3",
+      "x": 1560,
+      "y": 1140,
+      "w": 1440,
+      "h": 900
+    },
+    {
+      "file": "SinalPlanos.dc.html",
+      "title": "B · Sinal — Planos",
+      "page": "page-3",
+      "x": 3120,
+      "y": 1140,
+      "w": 1440,
+      "h": 900
+    },
+    {
+      "file": "ConsoleMetodo.dc.html",
+      "title": "11 · Como funciona",
+      "page": "page-1",
+      "x": 1280,
+      "y": 3420,
+      "w": 1440,
+      "h": 1560
+    },
+    {
+      "file": "ConsolePrompt.dc.html",
+      "title": "12 · Roteiro pronto",
+      "page": "page-1",
+      "x": 2960,
+      "y": 3420,
+      "w": 1440,
+      "h": 1120
+    }
+  ],
+  "annotations": [
+    {
+      "id": "guia-noite",
+      "page": "page-0",
+      "x": -420,
+      "y": 0,
+      "w": 360,
+      "text": "NOITE — O ESCURO DE HOJE, LIMPO\n\nA arquitetura é a que já está no Render: topo, coluna de 340px à esquerda com os passos, painel à direita. Nada de menu lateral novo.\n\nO que veio da Console: as superfícies (nenhum texto solto no fundo), o fade que dissolve em vez de cortar, a marca das barras, e os avisos redesenhados.\n\nO escuro deixou de ser chapado: #0B0E12 de fundo, #101419 nos cartões, #151A20 nos campos. Antes era #080808 com borda #1e1e1e — um degrau só, e por isso pesado."
+    },
+    {
+      "id": "nota-credito",
+      "page": "page-0",
+      "x": -420,
+      "y": 700,
+      "w": 360,
+      "text": "O CONTADOR\n\nEra mais uma pílula entre outras no topo. Agora é amarelo cheio com o número grande — o elemento de maior contraste da barra inteira.\n\nQuando o saldo está acabando ele inverte: fundo escuro, borda e número amarelos, com um ponto ao lado. Chama atenção sem virar alarme.\n\nEm 08, zerado, ele fica cinza e o peso migra para o aviso, que é onde está a ação."
+    },
+    {
+      "id": "nota-fade",
+      "page": "page-0",
+      "x": -420,
+      "y": 1200,
+      "w": 360,
+      "text": "ONDE ENTRA O FADE\n\nO guia de nomes tem um degradê amarelo de 7% que morre no fundo — é o que dá o destaque leve sem precisar de caixa.\n\nOs blocos de número (combinações, prontos, bem-vindo) sentam numa placa que dissolve.\n\nNa barra de gerar, quando está renderizando, o amarelo sobe por trás e se apaga.\n\nNenhum deles tem borda fechada: é sempre cor virando fundo."
+    },
+    {
+      "id": "nota-popups-noite",
+      "page": "page-0",
+      "x": -420,
+      "y": 2340,
+      "w": 360,
+      "text": "08 · CRÉDITOS ESGOTADOS\nO aviso vive colado no botão, no momento em que a pessoa ia gerar. Diz o que houve, o que fazer e quando volta sozinho. Ao lado, os três preços com o Pro em amarelo.\n\n09 e 10 · POP-UPS\nOs mesmos da versão clara, agora escuros. No legal, os campos em amarelo são o que falta: responsável, CPF/CNPJ e contato — exigência da LGPD antes da primeira cobrança."
+    },
+    {
+      "id": "nota-publicas-noite",
+      "page": "page-0",
+      "x": -420,
+      "y": 3480,
+      "w": 360,
+      "text": "11 e 12 · ABERTAS, ANTES DO LOGIN\n\nAgora escuras de ponta a ponta, como o resto.\n\n11 explica a dor em três batidas e mostra os cinco blocos desenhados como as barras da marca — a altura vale a duração de cada um.\n\n12 traz o prompt dentro do botão e a régua do teto de 1min30."
+    },
+    {
+      "id": "guia-console",
+      "page": "page-1",
+      "x": -420,
+      "y": 0,
+      "w": 360,
+      "text": "C · CONSOLE — CONJUNTO COMPLETO\n\nUma pessoa só, do login ao download: assinante Pro, uma geração de 15 vídeos em remix.\n\nO chrome é sempre o mesmo — menu fixo à esquerda, trilha no topo, saldo no pé. Só o miolo muda.\n\nAs duas abas vivem no mesmo cabeçalho: trocar de modo não troca de tela.\n\nVocabulário: o que a pessoa faz é uma GERAÇÃO. \"id\" é só o identificador dela."
+    },
+    {
+      "id": "nota-login",
+      "page": "page-1",
+      "x": -420,
+      "y": 700,
+      "w": 360,
+      "text": "01 · LOGIN\n\nA única tela escura do produto, e a única com movimento. Ela tem um trabalho só: em três segundos, mostrar o que o varvid faz.\n\nO leque em perspectiva É a explicação — um vídeo na frente, marcado como original, e as variações se afastando em profundidade. Cada cartão flutua no seu próprio tempo e uma faixa de luz varre o da frente, como um render passando.\n\nDepois do login tudo fica claro e parado. O drama é da porta de entrada."
+    },
+    {
+      "id": "nota-fluxo",
+      "page": "page-1",
+      "x": -420,
+      "y": 1200,
+      "w": 360,
+      "text": "OS ESTADOS DO FLUXO\n\n03 e 05: a área de arrastar arquivos é o centro da tela, e os ajustes ficam esmaecidos até existir arquivo.\n\n04: a mesma tela depois que os takes entram — o varvid já leu a estrutura sozinho.\n\n06: entradas travadas, barra de baixo vira status, prontos já baixáveis.\n\n07: some a coluna de estado e a grade ocupa tudo."
+    },
+    {
+      "id": "nota-marca",
+      "page": "page-2",
+      "x": -420,
+      "y": 0,
+      "w": 360,
+      "text": "Mesma dupla preto + amarelo e a mesma Poppins nas três, de propósito. O que as separa é peso, forma e dosagem do amarelo.\n\nA Console foi a escolhida — as outras duas ficam aqui como registro da decisão."
+    },
+    {
+      "id": "nota-arquivo",
+      "page": "page-3",
+      "x": -420,
+      "y": 0,
+      "w": 360,
+      "text": "ARQUIVO\n\nOfício e Sinal, as duas direções que não seguiram. Ficam para consulta — se a Console parecer pesada demais para o tamanho do produto, a Ofício é o caminho de volta mais curto."
+    },
+    {
+      "id": "nota-popups",
+      "page": "page-1",
+      "x": -420,
+      "y": 2340,
+      "w": 360,
+      "text": "08 · CRÉDITOS ESGOTADOS\nO único bloco escuro do produto, e mesmo assim em degradê, não chapado. O peso está reservado para este momento: acabou o crédito e existe uma ação clara a tomar. Em toda outra tela o destaque é amarelo sobre claro.\n\n09 e 10 · POP-UPS\nNo legal, os campos em amarelo são o que falta preencher: responsável, CPF/CNPJ e contato — exigência da LGPD antes da primeira cobrança."
+    },
+    {
+      "id": "nota-publicas",
+      "page": "page-1",
+      "x": -420,
+      "y": 3480,
+      "w": 360,
+      "text": "11 e 12 · ABERTAS, ANTES DO LOGIN\n\nUma ideia por tela, sem aula.\n\n11: quem posta mais vende mais, o gargalo é a edição, o varvid edita e multiplica. Só então os cinco blocos — desenhados como as barras da marca, com a altura valendo a duração de cada um. Os dois amarelos são os que se gravam em várias versões.\n\n12: o prompt mora dentro do botão. A tela mostra o que interessa — você escolhe a duração e ele ajusta a quantidade de takes."
+    }
+  ],
+  "launch": {
+    "view": "canvas",
+    "page": "page-0"
+  }
+}
