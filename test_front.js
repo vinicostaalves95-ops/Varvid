@@ -163,6 +163,24 @@ gerando=false; mode='single';
   check('e não fala em recarga automática distante',
         !/só vem em/.test(av), av);
 
+  console.log('\\n[Resultados] terminou a geração: a tela leva até os vídeos');
+  // Os resultados nascem abaixo da área de envio; em notebook eles caem fora da
+  // vista, e a geração parecia terminar sem entregar nada.
+  const alvo = document.getElementById('results');
+  let rolou = null;
+  alvo.scrollIntoView = (o) => { rolou = o; };
+  alvo.className = 'results show';
+  mostrarResultados();
+  await new Promise(r => setTimeout(r, 300));
+  check('rola até a grade de vídeos', !!rolou && rolou.block === 'start', JSON.stringify(rolou));
+  check('com animação, não com salto', !!rolou && rolou.behavior === 'smooth', JSON.stringify(rolou));
+
+  rolou = null;
+  alvo.className = 'results';            // nada gerado na tela
+  mostrarResultados();
+  await new Promise(r => setTimeout(r, 300));
+  check('sem resultado na tela, não mexe em nada', rolou === null, JSON.stringify(rolou));
+
   console.log('\\n[Indicação] o código do link sobrevive ao cadastro');
   // Entre clicar no link e existir uma conta tem um formulário e um e-mail de
   // confirmação no meio. A URL original não chega lá; o navegador sim.

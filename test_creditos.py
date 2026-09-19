@@ -279,7 +279,89 @@ check('volta pra fila zerado',
       (j['status'], j['completed'], j['files']))
 
 
-print("\n[15] Conferir saldo não é cobrar")
+print("\n[15] Conceder o plano: uma vez por pagamento")
+# /billing/success chamava set_plan() direto, e set_plan SOMA créditos. Quem
+# guardasse a URL de retorno ganhava a cota inteira a cada recarga. Agora o id
+# da sessão de checkout é reivindicado no banco, e só o primeiro concede.
+import urllib.error                                                   # noqa: E402
+
+CHECKOUTS = set()
+_sb_original = A._sb_rest
+
+
+def _sb_com_checkouts(metodo, caminho, corpo=None):
+    if caminho.startswith('checkouts_processados'):
+        if metodo == 'POST':
+            sid = (corpo or {}).get('session_id')
+            if sid in CHECKOUTS:
+                raise urllib.error.HTTPError(caminho, 409, 'duplicate key', {}, None)
+            CHECKOUTS.add(sid)
+            return [dict(corpo or {})]
+        return []
+    return _sb_falso(metodo, caminho, corpo)
+
+
+A._sb_rest = _sb_com_checkouts
+A.STRIPE_ENABLED = True
+
+SESSAO = {'id': 'cs_test_1', 'payment_status': 'paid', 'client_reference_id': 'uc',
+          'metadata': {'plan': 'starter', 'ciclo': 'mensal'},
+          'customer': 'cus_1', 'subscription': 'sub_1'}
+
+perfil('uc', credits=4, plan='free', renova_em=None)
+check('primeira volta concede', A.aplicar_checkout(dict(SESSAO)) is True)
+check('somou a cota ao que já tinha (4 + 50)', BANCO['uc']['credits'] == 54,
+      BANCO['uc']['credits'])
+check('e gravou a assinatura', BANCO['uc'].get('stripe_subscription_id') == 'sub_1',
+      BANCO['uc'].get('stripe_subscription_id'))
+
+check('recarregar a página não concede de novo',
+      A.aplicar_checkout(dict(SESSAO)) is False)
+A.aplicar_checkout(dict(SESSAO)); A.aplicar_checkout(dict(SESSAO))
+check('e o saldo não se mexe por mais que recarreguem',
+      BANCO['uc']['credits'] == 54, BANCO['uc']['credits'])
+
+# O webhook chega pelo servidor e pode vir antes ou depois da volta do
+# navegador. Quem chegar primeiro concede; o outro vê que já foi.
+perfil('uc', credits=0, plan='free', renova_em=None)
+CHECKOUTS.clear()
+outra = dict(SESSAO, id='cs_test_2')
+check('webhook primeiro: concede', A.aplicar_checkout(dict(outra)) is True)
+check('navegador depois: não repete', A.aplicar_checkout(dict(outra)) is False)
+check('uma cota só', BANCO['uc']['credits'] == 50, BANCO['uc']['credits'])
+
+# Pagamento não confirmado não vira plano.
+perfil('uc', credits=0, plan='free', renova_em=None)
+nao_paga = dict(SESSAO, id='cs_test_3', payment_status='unpaid')
+check('sessão não paga não concede nada', A.aplicar_checkout(nao_paga) is False)
+check('e o saldo continua zero', BANCO['uc']['credits'] == 0, BANCO['uc']['credits'])
+
+# Plano inventado na metadata não passa.
+perfil('uc', credits=0, plan='free', renova_em=None)
+falso = dict(SESSAO, id='cs_test_4', metadata={'plan': 'infinito', 'ciclo': 'mensal'})
+check('plano que não existe é recusado', A.aplicar_checkout(falso) is False)
+check('sem crédito nenhum', BANCO['uc']['credits'] == 0, BANCO['uc']['credits'])
+
+# Se o registro falhar por outro motivo (tabela ausente, banco fora), quem
+# pagou precisa receber. O log grita, mas o cliente não fica sem.
+def _sb_sem_tabela(metodo, caminho, corpo=None):
+    if caminho.startswith('checkouts_processados'):
+        raise urllib.error.HTTPError(caminho, 404, 'no such table', {}, None)
+    return _sb_falso(metodo, caminho, corpo)
+
+
+A._sb_rest = _sb_sem_tabela
+perfil('uc', credits=0, plan='free', renova_em=None)
+check('banco de registro fora: concede assim mesmo',
+      A.aplicar_checkout(dict(SESSAO, id='cs_test_5')) is True)
+check('quem pagou recebeu', BANCO['uc']['credits'] == 50, BANCO['uc']['credits'])
+A._sb_rest = _sb_com_checkouts
+
+A.STRIPE_ENABLED = False
+A._sb_rest = _sb_falso
+
+
+print("\n[16] Conferir saldo não é cobrar")
 perfil('uc', credits=10, renova_em=None)
 podeok, saldo, err = A.tem_creditos('uc', 5)
 check('tem saldo: deixa passar', podeok is True and err is None, (podeok, err))

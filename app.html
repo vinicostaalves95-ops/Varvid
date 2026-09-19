@@ -1169,9 +1169,35 @@ function startPolling(){
       }else if(!results.length){
         // terminou "com sucesso" e zero arquivos: takes irreconhecíveis
         toast('A geração terminou sem nenhum vídeo. Confira os nomes dos arquivos (Hook1, CTA1, Story…) e tente de novo.',true,0);
+      }else{
+        mostrarResultados();
       }
     }
   },1500);
+}
+
+/* Terminou: leva a pessoa até os vídeos.
+
+   Os resultados nascem abaixo da área de envio, então em tela de notebook eles
+   aparecem fora do campo de visão — a geração acaba e o que se vê é a mesma
+   tela de antes. Rolar até eles fecha o ciclo: começou no envio, termina na
+   entrega.
+
+   Só no fim de uma geração de verdade. Ao restaurar o último job na abertura da
+   página a tela fica quieta: saltar sozinha em quem acabou de chegar assusta
+   mais do que ajuda.
+
+   Quem pediu menos movimento no sistema recebe o salto seco, sem animação. */
+function mostrarResultados(){
+  const el=$('results');
+  if(!el || el.className.indexOf('show')===-1) return;
+  let suave=true;
+  try{ suave = !(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches); }catch(e){}
+  // Um respiro para a grade ser desenhada antes de medir onde ela está.
+  setTimeout(()=>{
+    try{ el.scrollIntoView({behavior: suave?'smooth':'auto', block:'start'}); }
+    catch(e){ try{ el.scrollIntoView(); }catch(_){} }
+  },140);
 }
 
 function renderResults(){

@@ -304,6 +304,15 @@ def _sb_rest(method, path, body=None):
             with urllib.request.urlopen(req, timeout=15) as resp:
                 raw = resp.read().decode()
                 return json.loads(raw) if raw else []
+        except urllib.error.HTTPError as e:
+            # 4xx é decisão do servidor, não oscilação: repetir dá o mesmo erro
+            # três vezes e atrasa quem está esperando. O 409 (conflito de chave)
+            # é resposta útil — quem reivindica um checkout conta com ela.
+            if 400 <= e.code < 500:
+                raise
+            last = e
+            if attempt < 2:
+                time.sleep(0.6 * (attempt + 1))
         except Exception as e:
             last = e
             if attempt < 2:
@@ -2056,6 +2065,23 @@ def login_page():
     return _read_html('login.html', LOGIN_HTML)
 
 
+@app.route('/como-funciona')
+def pagina_como_funciona():
+    """A metodologia dos cinco blocos: por que gravar assim e por que os nomes.
+
+    Páginas abertas, sem login: quem ainda não tem conta é exatamente quem
+    precisa entender o método antes de criar uma. Ficam fora do app de
+    propósito — o app é ferramenta, estas duas são explicação.
+    """
+    return _read_html('como_funciona.html', '<h1>como_funciona.html não encontrado</h1>')
+
+
+@app.route('/roteiro')
+def pagina_roteiro():
+    """O prompt pronto para colar numa IA e receber o roteiro já nos blocos."""
+    return _read_html('roteiro.html', '<h1>roteiro.html não encontrado</h1>')
+
+
 @app.route('/termos')
 @app.route('/privacidade')
 def pagina_legal():
@@ -2242,6 +2268,77 @@ def billing_portal():
         return jsonify({'error': 'portal_indisponivel'}), 500
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+#  CONCEDER O PLANO — uma vez por pagamento
+#
+#  Dois caminhos avisam que um pagamento passou: o navegador, que volta em
+#  /billing/success, e o webhook do Stripe, que chega pelo servidor. Os dois
+#  precisam existir — o navegador é rápido mas some se a pessoa fechar a aba, e
+#  o webhook é confiável mas pode demorar. Então ambos chamam esta função, e o
+#  que decide quem concede é o banco.
+#
+#  Antes, /billing/success chamava set_plan() direto. Como set_plan SOMA
+#  créditos, quem guardasse a URL de retorno ganhava a cota inteira a cada
+#  recarga da página. Era o mesmo erro do selo `cobrado` de 19/09, num lugar
+#  mais caro: ali era crédito não cobrado, aqui é crédito criado do nada.
+# ══════════════════════════════════════════════════════════════════════════════
+
+def reivindicar_checkout(sid, uid, plano, ciclo):
+    """Tenta marcar este pagamento como processado.
+
+    True  = ninguém tinha pego ainda; quem chamou deve conceder o plano.
+    False = já foi concedido por outro caminho; não faça nada.
+
+    A decisão é o INSERT: a chave primária é o id da sessão, então o segundo
+    esbarra em 409 e vai embora. Não existe janela entre conferir e gravar.
+    """
+    try:
+        _sb_rest('POST', 'checkouts_processados',
+                 {'session_id': sid, 'uid': uid, 'plano': plano, 'ciclo': ciclo})
+        return True
+    except urllib.error.HTTPError as e:
+        if e.code == 409:
+            return False
+        # Tabela ausente, chave errada, Supabase fora: concede assim mesmo.
+        # Quem pagou tem que receber. O log fica gritando para alguém olhar.
+        print('[SEGURANCA] nao consegui registrar o checkout %s (%s) — '
+              'concedendo mesmo assim, confira a tabela checkouts_processados'
+              % (sid, e))
+        return True
+    except Exception as e:
+        print('[SEGURANCA] erro ao registrar o checkout %s: %s — concedendo' % (sid, e))
+        return True
+
+
+def aplicar_checkout(sd):
+    """Dá o plano pago da sessão `sd` (o objeto checkout.session do Stripe)."""
+    if (sd or {}).get('payment_status') != 'paid':
+        return False
+    meta = sd.get('metadata') or {}
+    if not isinstance(meta, dict):
+        try:
+            meta = dict(meta)
+        except Exception:
+            meta = {}
+    uid = sd.get('client_reference_id') or meta.get('uid')
+    plan = meta.get('plan', 'free')
+    ciclo = meta.get('ciclo', 'mensal')
+    sid = sd.get('id')
+    if not uid or plan not in PLANS:
+        return False
+    if sid and not reivindicar_checkout(sid, uid, plan, ciclo):
+        print('[STRIPE] checkout %s ja aplicado — nada a fazer' % sid)
+        return False
+    extra = {}
+    if sd.get('customer'):
+        extra['stripe_customer_id'] = sd['customer']
+    if sd.get('subscription'):
+        extra['stripe_subscription_id'] = sd['subscription']
+    set_plan(uid, plan, ciclo, extra)
+    print('[STRIPE] plano %s/%s concedido a %s (checkout %s)' % (plan, ciclo, uid, sid))
+    return True
+
+
 @app.route('/billing/success')
 def billing_success():
     # Stripe redireciona o navegador pra cá após o pagamento.
@@ -2251,23 +2348,8 @@ def billing_success():
     try:
         s = stripe.checkout.Session.retrieve(sid)
         sd = s.to_dict() if hasattr(s, 'to_dict') else dict(s)
-        meta = sd.get('metadata') or {}
-        if not isinstance(meta, dict):
-            try:
-                meta = dict(meta)
-            except Exception:
-                meta = {}
-        if sd.get('payment_status') == 'paid':
-            uid = sd.get('client_reference_id') or meta.get('uid')
-            plan = meta.get('plan', 'free')
-            ciclo = meta.get('ciclo', 'mensal')
-            if uid and plan in PLANS:
-                extra = {}
-                if sd.get('customer'):
-                    extra['stripe_customer_id'] = sd['customer']
-                if sd.get('subscription'):
-                    extra['stripe_subscription_id'] = sd['subscription']
-                set_plan(uid, plan, ciclo, extra)
+        sd.setdefault('id', sid)
+        aplicar_checkout(sd)
         return redirect('/?assinatura=ok')
     except Exception as e:
         print('[STRIPE] erro no success:', e)
@@ -2298,7 +2380,13 @@ def billing_webhook():
     etype = event.get('type')
     obj = (event.get('data') or {}).get('object') or {}
     try:
-        if etype == 'invoice.paid':
+        if etype == 'checkout.session.completed':
+            # O caminho CONFIÁVEL de conceder o plano. A volta pelo navegador é
+            # mais rápida, mas some se a pessoa fechar a aba no meio — e aí o
+            # pagamento entrava e o plano não. Os dois passam pelo mesmo
+            # reivindicar_checkout(), então quem chegar primeiro concede.
+            aplicar_checkout(obj)
+        elif etype == 'invoice.paid':
             # NÃO repõe crédito aqui, de propósito. Quem repõe é a data no
             # perfil. Este bloco chegava a `credits = cota do plano`, o que hoje
             # APAGARIA o saldo acumulado: quem tivesse 400 guardados voltaria

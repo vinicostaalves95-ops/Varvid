@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Roteiro pronto · varvid</title>
+<meta name="description" content="Um prompt pronto para colar na sua IA e receber o roteiro já dividido nos blocos que o varvid usa.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* varvid · roteiro pronto — reconstruída a partir da prancha 12 do design. */
+:root{
+  --grafite:#101318; --amarelo:#FFC700; --amarelo2:#FFD336;
+  --bg:#0B0E12; --bg2:#101419; --bg3:#151A20; --campo:#0F1318;
+  --linha:#212932; --linha2:#1A2028; --linha3:#2A3540;
+  --t1:#FFFFFF; --t2:#C6CDD6; --t3:#98A1AC; --t4:#6C7681; --t5:#4B545E;
+  --am-sua:rgba(255,199,0,.10); --am-bor:rgba(255,199,0,.28); --ok:#5FD39B;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--t1);font-family:'Poppins',system-ui,-apple-system,sans-serif;
+  font-size:14px;-webkit-font-smoothing:antialiased;line-height:1.5}
+a{color:inherit;text-decoration:none}
+
+.topo{position:sticky;top:0;z-index:20;background:rgba(11,14,18,.92);backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--linha2)}
+.topo-in{max-width:1080px;margin:0 auto;padding:0 24px;height:66px;display:flex;align-items:center;
+  justify-content:space-between;gap:16px}
+.marca{display:flex;align-items:center;gap:10px;flex-shrink:0}
+.marca .nm{font-size:18px;font-weight:700;letter-spacing:-.022em}
+.menu{display:flex;align-items:center;gap:4px}
+.menu a{font-size:13px;color:var(--t3);padding:8px 13px;border-radius:8px;white-space:nowrap}
+.menu a:hover{color:var(--t1)}
+.menu a.on{color:var(--grafite);background:var(--amarelo);font-weight:500}
+.acoes{display:flex;align-items:center;gap:12px;flex-shrink:0}
+.acoes .entrar{font-size:13px;color:var(--t3)}
+.acoes .entrar:hover{color:var(--t1)}
+.btn-branco{font-size:13.5px;font-weight:600;color:var(--grafite);background:#fff;
+  border-radius:9px;padding:10px 16px;white-space:nowrap}
+
+.capa{position:relative;overflow:hidden;border-bottom:1px solid var(--linha2)}
+.brilho{position:absolute;right:-180px;top:-220px;width:760px;height:760px;border-radius:50%;
+  background:radial-gradient(circle,rgba(255,199,0,.13) 0%,rgba(255,199,0,0) 66%);pointer-events:none}
+.grade{position:absolute;inset:0;pointer-events:none;
+  background-image:linear-gradient(rgba(255,255,255,.024) 1px,transparent 1px),
+                   linear-gradient(90deg,rgba(255,255,255,.024) 1px,transparent 1px);background-size:64px 64px}
+.faixa{position:relative;max-width:1080px;margin:0 auto;padding:60px 24px 66px}
+.selo{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:var(--amarelo);
+  background:var(--am-sua);border:1px solid var(--am-bor);border-radius:999px;padding:7px 14px}
+h1{font-size:clamp(30px,4.8vw,50px);font-weight:700;letter-spacing:-.035em;line-height:1.1;
+  max-width:760px;margin-top:20px}
+h1 .am{color:var(--amarelo)}
+.linha-fina{font-size:clamp(15px,2vw,17px);line-height:1.6;color:var(--t3);max-width:640px;margin-top:20px}
+
+.secao{max-width:1080px;margin:0 auto;padding:60px 24px}
+.secao+.secao{border-top:1px solid var(--linha2)}
+.rotulo{font-size:10.5px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--t4)}
+h2{font-size:clamp(21px,3vw,28px);font-weight:700;letter-spacing:-.03em;line-height:1.2;margin:12px 0 14px}
+.secao>p{font-size:14.5px;line-height:1.65;color:var(--t3);max-width:660px}
+
+/* régua do teto */
+.regua{margin-top:30px;border:1px solid var(--linha);border-radius:16px;padding:24px;background:var(--bg2)}
+.barra{position:relative;height:42px;border-radius:10px;background:var(--bg3);border:1px solid var(--linha);overflow:hidden}
+.cheio{position:absolute;left:0;top:0;bottom:0;width:50%;
+  background:linear-gradient(90deg,rgba(255,199,0,.85) 0%,rgba(255,199,0,.45) 100%)}
+.folga{position:absolute;right:14px;top:50%;transform:translateY(-50%);font-size:12px;color:var(--t4)}
+.marcas{display:flex;justify-content:space-between;font-family:ui-monospace,Menlo,monospace;
+  font-size:11px;color:var(--t4);margin-top:9px}
+.marcas .meio{color:var(--amarelo)}
+.regua p{font-size:13.5px;line-height:1.6;color:var(--t3);margin-top:16px}
+.regua b{color:var(--t1);font-weight:600}
+
+/* o que volta */
+.fluxo{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:26px}
+.etapa{border:1px solid var(--linha);border-radius:11px;padding:12px 16px;background:var(--bg2);
+  font-size:13.5px;font-weight:500}
+.etapa.varia{border-color:var(--am-bor);background:var(--am-sua);color:var(--amarelo)}
+.seta{color:var(--t5);font-size:15px}
+.arquivos{font-size:13.5px;line-height:1.7;color:var(--t3);margin-top:20px}
+.arquivos code{font-family:ui-monospace,Menlo,monospace;font-size:12.5px;color:var(--amarelo);
+  background:var(--campo);border:1px solid var(--linha);border-radius:6px;padding:2px 7px}
+
+.lista{display:grid;gap:10px;margin-top:26px;max-width:680px}
+.item{display:flex;gap:11px;align-items:flex-start;font-size:14px;line-height:1.55;color:var(--t2)}
+.item svg{width:17px;height:17px;flex-shrink:0;margin-top:2px;color:var(--amarelo)}
+
+/* copiar */
+.copiar-caixa{margin-top:34px;border:1px solid var(--am-bor);border-radius:16px;padding:26px;
+  background:linear-gradient(170deg,var(--am-sua) 0%,rgba(11,14,18,0) 78%);
+  display:flex;align-items:center;gap:20px;flex-wrap:wrap}
+.btn-copiar{font-family:inherit;font-size:15px;font-weight:600;color:var(--grafite);border:none;cursor:pointer;
+  background:linear-gradient(180deg,var(--amarelo) 0%,var(--amarelo2) 100%);
+  border-radius:11px;padding:15px 26px;white-space:nowrap}
+.btn-copiar:hover{filter:brightness(1.04)}
+.btn-copiar.feito{background:var(--ok);color:#06251a}
+.copiar-caixa .exp{font-size:13.5px;line-height:1.6;color:var(--t3);flex:1;min-width:240px}
+.prompt-cru{position:absolute;left:-9999px;top:0;width:1px;height:1px;opacity:0}
+
+.fim{border-top:1px solid var(--linha2);background:var(--bg2)}
+.fim-in{max-width:1080px;margin:0 auto;padding:52px 24px;display:flex;align-items:center;
+  justify-content:space-between;gap:24px;flex-wrap:wrap}
+.fim p{font-size:15px;line-height:1.6;color:var(--t2);max-width:520px}
+.botoes{display:flex;gap:12px;flex-wrap:wrap}
+.btn-am{font-size:14.5px;font-weight:600;color:var(--grafite);
+  background:linear-gradient(180deg,var(--amarelo) 0%,var(--amarelo2) 100%);
+  border-radius:11px;padding:14px 22px;white-space:nowrap}
+.btn-vazio{font-size:14.5px;font-weight:500;color:var(--t2);border:1px solid var(--linha3);
+  border-radius:11px;padding:14px 22px;white-space:nowrap}
+.btn-vazio:hover{color:var(--t1);border-color:var(--t4)}
+.rodape{border-top:1px solid var(--linha2);padding:22px 24px;text-align:center;font-size:12px;color:var(--t5)}
+.rodape a{color:var(--t4)}
+
+@media (max-width:820px){ .faixa{padding:48px 24px 52px} .secao{padding:48px 24px} }
+@media (max-width:560px){
+  .menu{display:none}
+  .acoes .entrar{display:none}
+  .btn-copiar{width:100%}
+}
+</style>
+</head>
+<body>
+
+<header class="topo">
+  <div class="topo-in">
+    <div style="display:flex;align-items:center;gap:26px">
+      <a class="marca" href="/">
+        <svg viewBox="0 0 22 22" width="22" height="22" fill="none" aria-hidden="true"><rect x="1" y="6" width="4" height="10" rx="2" fill="#fff"/><rect x="7" y="2" width="4" height="18" rx="2" fill="#fff"/><rect x="13" y="5" width="4" height="12" rx="2" fill="#FFC700"/><rect x="19" y="8" width="3" height="6" rx="1.5" fill="#fff" opacity=".35"/></svg>
+        <span class="nm">varvid</span>
+      </a>
+      <nav class="menu">
+        <a href="/como-funciona">Como funciona</a>
+        <a class="on" href="/roteiro">Roteiro pronto</a>
+      </nav>
+    </div>
+    <div class="acoes">
+      <a class="entrar" href="/login">Entrar</a>
+      <a class="btn-branco" href="/login">Criar conta grátis</a>
+    </div>
+  </div>
+</header>
+
+<section class="capa">
+  <div class="brilho"></div><div class="grade"></div>
+  <div class="faixa">
+    <span class="selo">Grátis · não precisa de conta</span>
+    <h1>Gere vídeos melhores com <span class="am">um roteiro bem estruturado.</span></h1>
+    <p class="linha-fina">Um prompt pronto. Cole na sua IA com as fotos do produto, diga quantos segundos quer de vídeo, e receba o roteiro já dividido nos blocos que o varvid usa.</p>
+  </div>
+</section>
+
+<section class="secao">
+  <div class="rotulo">Já nasce dentro do limite</div>
+  <h2>O roteiro respeita o teto antes de você gravar.</h2>
+
+  <div class="regua">
+    <div class="barra"><div class="cheio"></div><span class="folga">folga</span></div>
+    <div class="marcas"><span>0s</span><span class="meio">o roteiro deste exemplo fecha em 45s</span><span>teto 1min30</span></div>
+    <p>O varvid gera vídeos de até <b>1min30</b>. Você diz à IA quantos segundos quer e ela distribui os cinco blocos dentro desse teto — assim você não grava take que não vai caber, nem sobe um arquivo que vai ser recusado na hora do envio.</p>
+  </div>
+</section>
+
+<section class="secao">
+  <div class="rotulo">Ele volta nesse formato</div>
+  <h2>Os cinco blocos, prontos para gravar.</h2>
+
+  <div class="fluxo">
+    <span class="etapa varia">Hook</span><span class="seta">→</span>
+    <span class="etapa">Story</span><span class="seta">→</span>
+    <span class="etapa">Revelação</span><span class="seta">→</span>
+    <span class="etapa">Prova</span><span class="seta">→</span>
+    <span class="etapa varia">CTA</span>
+  </div>
+
+  <div class="arquivos">Com o nome de cada arquivo já definido — <code>Hook1.mp4</code>, <code>Story.mp4</code> — para você gravar e subir sem pensar.</div>
+
+  <div class="lista">
+    <div class="item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polyline points="20 6 9 17 4 12"/></svg><span>Um roteiro completo, bloco a bloco</span></div>
+    <div class="item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polyline points="20 6 9 17 4 12"/></svg><span>Cinco ganchos e três chamadas extras — o que vira o remix</span></div>
+    <div class="item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polyline points="20 6 9 17 4 12"/></svg><span>O que falar e como gravar cada cena</span></div>
+  </div>
+
+  <div class="copiar-caixa">
+    <button class="btn-copiar" id="btnCopiar" onclick="copiarPrompt()">Copiar o prompt</button>
+    <div class="exp" id="expCopiar">Vai para a área de transferência pronto. Cole na sua IA junto com as fotos do produto.</div>
+  </div>
+  <!-- O prompt vive aqui, fora da vista: a página mostra o que a pessoa ganha,
+       não o texto cru. O textarea existe porque é o caminho que funciona quando
+       a API de área de transferência é bloqueada (http sem TLS, navegador antigo). -->
+  <textarea class="prompt-cru" id="promptCru" readonly aria-hidden="true">Você é roteirista de vídeo curto para TikTok Shop.
+
+Vou anexar fotos do produto (frente e verso com os ingredientes) e dizer quantos
+segundos quero de vídeo. Escreva o roteiro dentro dessa duração — sem encher
+linguiça para chegar lá, sem estourar.
+
+DURAÇÃO ALVO: [30s | 45s | 60s | 90s]
+
+LIMITE TÉCNICO — não negocie
+O vídeo final não pode passar de 1 minuto e 30 segundos. Some a duração dos
+cinco blocos antes de me entregar: se passar de 90 segundos, encurte os blocos
+até caber. Nunca proponha um roteiro que estoure esse teto.
+
+REGRA CENTRAL
+O produto não aparece nos primeiros 70% do tempo. Antes disso existe só gancho,
+dor, história e o que a pessoa sentiu — sem citar o produto. Ele entra no fim,
+como resposta a um desejo que o vídeo já criou. Produto no começo vira
+propaganda, e propaganda a pessoa rola.
+
+ESTRUTURA — cinco blocos, proporcionais à duração pedida
+1. HOOK — os primeiros 3 a 5 segundos. Para o dedo. Um texto de até 12 palavras
+   que funcione com o som desligado, mais duas frases faladas. Não cita o produto.
+2. STORY — até cerca de 30% do tempo. Confirme a dor, aprofunde e vire com um
+   "até que...". Fale do que se sentiu e do que mudou, nunca do que causou.
+3. REVELAÇÃO — até cerca de 50%. Agora sim: mostre o produto na mão, diga o nome,
+   o ingrediente que importa, a textura.
+4. PROVA — até cerca de 70%. Produto em uso, avaliação de quem comprou, um
+   resultado específico.
+5. CTA — o tempo que sobrar. A sacolinha, com escassez e tom de amiga, nunca de
+   vendedor.
+
+ENTREGUE EXATAMENTE ISTO
+- 1 roteiro completo, bloco a bloco, com a duração de cada bloco em segundos e a
+  fala exata. No fim, a soma total em segundos.
+- 5 versões alternativas apenas do HOOK, cada uma com um ângulo diferente
+  (curiosidade, contrariar o senso comum, história pessoal, prova social, erro
+  comum). Todas com a mesma duração do hook original.
+- 3 versões alternativas apenas do CTA, também com a mesma duração.
+- 1 headline para a legenda, no máximo 15 palavras, falando do resultado
+  desejado e não do produto.
+- 1 briefing de gravação por bloco: cenário, enquadramento, tom de voz e o texto
+  que aparece na tela.
+
+COMO SALVAR OS ARQUIVOS
+Termine listando o nome de cada gravação, exatamente assim:
+  Hook1.mp4, Hook2.mp4, Hook3.mp4, Hook4.mp4, Hook5.mp4
+  Story.mp4
+  Revelacao.mp4
+  Prova.mp4
+  CTA1.mp4, CTA2.mp4, CTA3.mp4
+
+REGRAS
+Português brasileiro, tom de conversa. Nenhuma promessa de cura ou resultado
+médico. As palavras "compre", "oferta" e "link" só aparecem no CTA. Respeite a
+duração pedida: se ela for curta, reduza o número de versões alternativas em vez
+de acelerar a fala. Nas cenas de STORY o criador não segura o produto.</textarea>
+</section>
+
+<div class="fim">
+  <div class="fim-in">
+    <p>Com o roteiro na mão, grave os blocos numa tarde e suba tudo no varvid — ele monta as combinações e devolve dezenas de vídeos prontos.</p>
+    <div class="botoes">
+      <a class="btn-vazio" href="/como-funciona">Ver como funciona</a>
+      <a class="btn-am" href="/login">Começar grátis</a>
+    </div>
+  </div>
+  <div class="rodape">varvid · <a href="/termos">Termos de Uso</a> · <a href="/privacidade">Política de Privacidade</a></div>
+</div>
+
+<script>
+/* Copiar com dois caminhos. O moderno exige contexto seguro (https) e permissão;
+   quando ele não existe, selecionar o texto e mandar copiar ainda funciona. Sem
+   os dois, a pessoa fica sem saída — e o botão é a razão da página existir. */
+async function copiarPrompt(){
+  const btn = document.getElementById('btnCopiar');
+  const exp = document.getElementById('expCopiar');
+  const area = document.getElementById('promptCru');
+  const texto = area.value;
+  let ok = false;
+  try{
+    if(navigator.clipboard && window.isSecureContext){
+      await navigator.clipboard.writeText(texto);
+      ok = true;
+    }
+  }catch(e){ ok = false; }
+  if(!ok){
+    try{
+      area.style.position='static'; area.style.opacity='0'; area.style.height='1px';
+      area.select(); area.setSelectionRange(0, texto.length);
+      ok = document.execCommand('copy');
+      area.style.position='absolute'; area.style.left='-9999px';
+    }catch(e){ ok = false; }
+  }
+  if(ok){
+    btn.textContent = 'Copiado ✓';
+    btn.classList.add('feito');
+    exp.textContent = 'Pronto. Cole na sua IA junto com as fotos do produto e diga quantos segundos quer de vídeo.';
+    setTimeout(()=>{ btn.textContent='Copiar o prompt'; btn.classList.remove('feito');
+      exp.textContent='Vai para a área de transferência pronto. Cole na sua IA junto com as fotos do produto.'; }, 6000);
+  }else{
+    exp.textContent = 'Seu navegador bloqueou a cópia automática. Selecione o texto do prompt e copie na mão — ou abra esta página em outro navegador.';
+    area.style.position='static'; area.style.opacity='1'; area.style.width='100%';
+    area.style.height='320px'; area.style.background='#0F1318'; area.style.color='#C6CDD6';
+    area.style.border='1px solid #212932'; area.style.borderRadius='12px'; area.style.padding='16px';
+    area.style.fontFamily='ui-monospace,Menlo,monospace'; area.style.fontSize='12px';
+    area.setAttribute('aria-hidden','false');
+  }
+}
+</script>
+</body></html>

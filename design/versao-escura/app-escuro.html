@@ -61,6 +61,33 @@ button{font-family:inherit}
 .user .planos-btn{display:none;align-items:center;font-size:12.5px;font-weight:500;color:var(--t2);
   background:transparent;border:1px solid var(--linha);border-radius:9px;padding:8px 14px;cursor:pointer}
 .user .planos-btn:hover{border-color:var(--linha3);color:var(--t1)}
+/* Indicação é oferta, não tarefa: o botão fica no tom do produto, discreto,
+   sem competir com o Planos ao lado. */
+.user .indica-btn{color:var(--amarelo);border-color:var(--am-bor)}
+.user .indica-btn:hover{border-color:var(--amarelo);color:var(--amarelo)}
+/* O Limpar apaga vídeo já cobrado. Armado, ele vira a própria pergunta. */
+.btn-clear-all.armado{color:var(--amarelo);border-color:var(--am-bor);font-weight:600}
+.btn-clear-all.armado:hover{color:var(--amarelo);border-color:var(--amarelo)}
+.modal-estreito{max-width:560px}
+.ref-como{display:grid;gap:11px}
+.ref-passo{display:flex;gap:12px;align-items:flex-start;font-size:13px;color:var(--t3);line-height:1.5}
+.ref-passo b{color:var(--t1);font-weight:600}
+.ref-num{flex-shrink:0;width:22px;height:22px;border-radius:7px;background:var(--am-sua);
+  border:1px solid var(--am-bor);color:var(--amarelo);font-family:ui-monospace,monospace;
+  font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.ref-link-row{display:flex;gap:10px}
+.ref-link{flex:1;min-width:0;background:var(--campo);border:1px solid var(--linha);border-radius:10px;
+  padding:13px 14px;font-family:ui-monospace,monospace;font-size:12.5px;color:var(--t2);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ref-copy{flex-shrink:0;background:var(--amarelo);color:var(--grafite);border:none;border-radius:10px;
+  padding:0 20px;font-size:13.5px;font-weight:600;cursor:pointer}
+.ref-copy:hover{filter:brightness(1.04)}
+.ref-placar{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.ref-card{background:var(--bg2);border:1px solid var(--linha);border-radius:12px;padding:14px 10px;text-align:center}
+.ref-card .n{font-size:26px;font-weight:700;letter-spacing:-.03em;color:var(--t1);line-height:1}
+.ref-card .l{font-size:11.5px;color:var(--t4);margin-top:5px;line-height:1.35}
+.ref-teto{font-size:12.5px;color:var(--t4);text-align:center;line-height:1.5}
+.ref-teto b{color:var(--t2)}
 .user .out{font-size:12.5px;color:var(--t4);background:none;border:none;cursor:pointer;padding:8px 4px}
 .user .out:hover{color:var(--t2)}
 
@@ -134,7 +161,16 @@ button{font-family:inherit}
   font-family:inherit;font-size:18px;font-weight:700;color:var(--amarelo);-moz-appearance:textfield}
 .hl-dur input::-webkit-outer-spin-button,.hl-dur input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 .hl-dur .u{font-size:11px;color:var(--t4)}
-.nota-sec{font-size:11px;line-height:1.55;color:var(--t4)}
+.hl-dur input::placeholder{color:var(--t4);opacity:1;letter-spacing:.06em}
+.nota-sec{font-size:10.5px;line-height:1.45;color:var(--t5)}
+/* Mesma dissolvência amarela do guia: marca os dois lugares da coluna que a
+   pessoa precisa ler, sem usar caixa nem borda. */
+.bloco-destaque{background:linear-gradient(180deg,var(--am-sua) 0%,rgba(11,14,18,0) 78%)}
+.hl-dur .box{border:1px solid var(--linha);border-radius:9px;padding:6px 10px;background:var(--bg3)}
+.hl-dur .box:focus-within{border-color:var(--amarelo)}
+.hl-hint{font-size:11px;line-height:1.5;color:var(--t4)}
+.intro{font-size:12.5px;line-height:1.55;color:var(--t2)}
+.intro b{color:var(--t1);font-weight:600}
 
 /* estrutura detectada */
 .mx-card-label{font-size:11.5px;font-weight:500;color:var(--t3);margin-bottom:7px}
@@ -142,6 +178,7 @@ button{font-family:inherit}
   border-radius:9px;padding:9px 11px;margin-bottom:6px;border:1px solid var(--linha2)}
 .mx-row.on{background:var(--am-sua);border-color:var(--am-bor)}
 .mx-row.soon{background:rgba(255,255,255,.02)}
+.mx-row.soon .mx-rname{color:var(--t3)}
 .mx-rname{font-size:12.5px;font-weight:500;color:var(--t1)}
 /* O script marca os blocos fixos com color:#888 inline — no escuro isso some. */
 .mx-row.soon .mx-rname[style]{color:var(--t3)!important}
@@ -153,6 +190,10 @@ button{font-family:inherit}
 .combo-bar{border-top:1px solid var(--linha2);padding-top:13px;display:flex;align-items:flex-end;gap:12px}
 .combo-num{font-size:30px;font-weight:700;letter-spacing:-.03em;line-height:1;color:var(--amarelo)}
 .combo-label{font-size:11.5px;color:var(--t3);margin-top:3px}
+/* "Estrutura detectada" removida da tela a pedido. Os elementos continuam no
+   HTML porque o renderStructure escreve neles a cada análise — tirá-los do
+   documento quebraria o envio dos takes por causa de uma decisão visual. */
+#remix-right,#single-right{display:none!important}
 .combo-formula{font-family:ui-monospace,monospace;font-size:10.5px;color:var(--t5);padding-bottom:3px}
 .combo-disc{font-size:11px;line-height:1.55;color:var(--t4)}
 
@@ -245,12 +286,26 @@ button{font-family:inherit}
 .results-warn{font-size:11.5px;line-height:1.55;color:var(--t4);background:rgba(255,255,255,.02);
   border:1px solid var(--linha2);border-radius:9px;padding:10px 12px}
 .results-warn b{font-weight:600;color:var(--t2)}
-.res-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:9px}
-.res{display:flex;align-items:center;gap:10px;background:var(--bg3);border:1px solid var(--linha);
-  border-radius:9px;padding:10px 12px}
-.res .n{flex:1;font-size:12.5px;font-weight:500;color:var(--t2)}
-.res .b{font-size:13px;color:var(--grafite);background:var(--amarelo);border:none;
-  border-radius:7px;padding:5px 10px;cursor:pointer;line-height:1}
+/* Os resultados como cartões na vertical, no formato do vídeo — é assim que a
+   prancha 07 do design mostra, e é o que faz a tela parecer uma entrega em vez
+   de uma lista de arquivos. O retângulo 9:16 é um ::before: o JS que monta esta
+   grade é o mesmo da versão no ar e não podia mudar, então a moldura do vídeo
+   vem do CSS. */
+.res-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(116px,1fr));gap:12px}
+.res{display:grid;grid-template-columns:1fr auto;grid-template-areas:'quadro quadro' 'nome baixar';
+  align-items:center;gap:7px;background:none;border:none;padding:0;position:relative}
+.res::before{content:'';grid-area:quadro;aspect-ratio:9/16;border-radius:10px;
+  background:linear-gradient(170deg,var(--bg3) 0%,var(--campo) 100%);border:1px solid var(--linha)}
+.res::after{content:'';position:absolute;left:50%;top:calc((100% - 31px)/2);
+  transform:translate(-50%,-50%);width:0;height:0;
+  border-left:13px solid rgba(255,199,0,.55);border-top:8px solid transparent;
+  border-bottom:8px solid transparent;pointer-events:none}
+.res:hover::before{border-color:var(--linha3)}
+.res .n{grid-area:nome;font-family:ui-monospace,Menlo,monospace;font-size:10.5px;
+  color:var(--t3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.res .b{grid-area:baixar;width:24px;height:24px;flex-shrink:0;font-size:12px;line-height:1;
+  color:var(--grafite);background:var(--amarelo);border:none;border-radius:7px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center}
 .res .b:hover{filter:brightness(1.06)}
 
 /* os quatro passos, discretos: lembram a ordem sem competir com o balão */
@@ -336,6 +391,9 @@ button{font-family:inherit}
   .var-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
 }
 @media (max-width:420px){
+  .ref-placar{grid-template-columns:1fr}
+  .ref-link-row{flex-direction:column}
+  .ref-copy{padding:13px 20px}
   .marca .ver{display:none}
   .gen-row{flex-direction:column;align-items:stretch}
   .btn-clear-all{width:100%}
@@ -358,6 +416,7 @@ button{font-family:inherit}
     </div>
     <div class="user" id="userWrap">
       <span class="credits" id="creditsPill" style="display:none">—</span>
+      <button class="planos-btn indica-btn" id="indicaBtn" style="display:none" onclick="abrirIndicacao()">Indique e ganhe</button>
       <button class="planos-btn" id="planosBtn" style="display:none" onclick="openPlans()">Planos</button>
       <span class="em" id="userEmail"></span>
       <button class="out" onclick="logout()">Sair</button>
@@ -380,60 +439,67 @@ button{font-family:inherit}
 
         <!-- REMIX: guia de nomes -->
         <div class="guia" id="naming-sec">
-          <div class="guia-hdr open" id="naming-hdr" onclick="toggleGuia('naming')">
+          <div class="guia-hdr" id="naming-hdr" onclick="toggleGuia('naming')">
             <span class="guia-ic"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#101318" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg></span>
-            <span><span class="guia-tit">Como nomear os arquivos</span><span class="guia-sub">comece por aqui — o nome diz o que é cada take</span></span>
+            <span class="guia-tit">Leia antes de subir os takes</span>
             <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
           </div>
-          <div class="collapse-body open" id="naming-body">
+          <div class="collapse-body" id="naming-body">
+            <div class="intro">Dê a cada arquivo o nome do seu <b>bloco</b>. É assim que o VarVid monta as combinações:</div>
             <div class="grp">
-              <div class="grp-h"><span class="grp-name">Remixam entre si</span><span class="grp-sub">giram para gerar variações</span></div>
+              <div class="grp-h"><span class="grp-name">Misturados</span><span class="grp-sub">giram pra gerar variações</span></div>
               <div class="ng-row"><span><span class="ng-name">Hook</span><span class="ng-desc">o gancho que prende</span></span><span class="ng-file">Hook1.mp4</span></div>
               <div class="ng-row"><span><span class="ng-name">CTA</span><span class="ng-desc">a chamada pra agir</span></span><span class="ng-file">CTA1.mp4</span></div>
+              <div class="grp-note">Grave 2 ou mais de cada e numere (<code>Hook1</code>, <code>Hook2</code>) pra multiplicar as versões.</div>
             </div>
             <div class="grp">
-              <div class="grp-h"><span class="grp-name">Ficam iguais</span><span class="grp-sub">repetem em todos</span></div>
+              <div class="grp-h"><span class="grp-name">Mantidos</span><span class="grp-sub">ficam iguais em todos</span></div>
               <div class="ng-row"><span><span class="ng-name">Story</span><span class="ng-desc">a história / contexto</span></span><span class="ng-file">Story.mp4</span></div>
               <div class="ng-row"><span><span class="ng-name">Revelação</span><span class="ng-desc">a virada</span></span><span class="ng-file">Revelacao.mp4</span></div>
               <div class="ng-row"><span><span class="ng-name">Prova</span><span class="ng-desc">resultado / prova social</span></span><span class="ng-file">Prova.mp4</span></div>
             </div>
-            <div class="grp-note">Numere para multiplicar as versões: <code>Hook1</code>, <code>Hook2</code>. Bloco muito longo quebra em <code>_pt1</code>, <code>_pt2</code> — ele junta na ordem certa.</div>
+            <div class="ng-tip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 3v18M18 3v18M6 12h12M9 8h6M9 16h6"/></svg><span>Bloco muito longo? Quebre em partes com <code>_pt1</code>, <code>_pt2</code> — vale pra qualquer bloco, inclusive hooks e CTAs (ex.: <code>Hook1_pt1</code>, <code>Hook1_pt2</code>). Ele junta na ordem certa.</span></div>
           </div>
         </div>
 
         <!-- VÍDEO ÚNICO: guia de uso -->
         <div class="guia" id="single-sec" style="display:none">
-          <div class="guia-hdr open" id="single-hdr" onclick="toggleGuia('single')">
+          <div class="guia-hdr" id="single-hdr" onclick="toggleGuia('single')">
             <span class="guia-ic"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#101318" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg></span>
-            <span><span class="guia-tit">Como funciona o vídeo único</span><span class="guia-sub">um arquivo pronto, várias cópias distintas</span></span>
+            <span class="guia-tit">Leia antes de subir o vídeo</span>
             <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
           </div>
-          <div class="collapse-body open" id="single-body">
+          <div class="collapse-body" id="single-body">
+            <div class="intro">Aqui vai <b>um vídeo só</b>, já montado e pronto pra postar. O VarVid devolve várias cópias dele, cada uma com pequenas diferenças — cortes de quadros, variação de enquadramento e assinatura digital distinta — para as plataformas lerem como vídeos diferentes.</div>
             <div class="grp">
               <div class="grp-h"><span class="grp-name">O que entra</span><span class="grp-sub">um arquivo por vez</span></div>
               <div class="ng-row"><span><span class="ng-name">Formato</span><span class="ng-desc">o que sai de qualquer celular</span></span><span class="ng-file">.mp4 · .mov</span></div>
-              <div class="ng-row"><span><span class="ng-name">Duração</span><span class="ng-desc">mais longo é recusado antes do envio</span></span><span class="ng-file">até 1min30</span></div>
+              <div class="ng-row"><span><span class="ng-name">Duração</span><span class="ng-desc">vídeos mais longos são recusados antes do envio</span></span><span class="ng-file">até 1min30</span></div>
             </div>
             <div class="grp">
-              <div class="grp-h"><span class="grp-name">Qual modo usar</span><span class="grp-sub">a confusão mais comum</span></div>
+              <div class="grp-h"><span class="grp-name">Quando usar o outro modo</span><span class="grp-sub">é a confusão mais comum</span></div>
               <div class="ng-row"><span><span class="ng-name">Tenho o vídeo pronto</span><span class="ng-desc">quero várias versões dele</span></span><span class="ng-file">Vídeo único</span></div>
-              <div class="ng-row"><span><span class="ng-name">Tenho takes separados</span><span class="ng-desc">quero que ele monte</span></span><span class="ng-file">Remix de takes</span></div>
+              <div class="ng-row"><span><span class="ng-name">Tenho takes separados</span><span class="ng-desc">hook, story, CTA — quero que ele monte</span></span><span class="ng-file">Remix de takes</span></div>
             </div>
             <div class="ng-tip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><span>O headline é escrito por cima do vídeo, com um estilo diferente em cada variação. Deixe em branco se o seu vídeo já tem texto.</span></div>
           </div>
         </div>
 
-        <!-- headline -->
-        <div class="bloco">
+        <!-- headline — mesma placa amarela dissolvendo do guia: é um campo
+             que a pessoa costuma passar batido, e o fundo o traz pra frente. -->
+        <div class="bloco bloco-destaque">
           <div class="bloco-hdr"><span class="rlabel">Headline no vídeo</span><span class="opt">opcional</span></div>
           <div class="hl-col">
             <textarea class="hl-ta" id="hl" maxlength="80" placeholder="Texto do headline… (vazio = sem texto)"></textarea>
+            <!-- O número aqui não parecia editável: era texto solto, sem moldura.
+                 Agora tem cara de campo, e a frase abaixo diz o que fazer com ele. -->
             <div class="hl-dur">
               <span class="lb">Aparece por</span>
-              <span class="box"><input type="number" id="hd" value="3" min="1" max="15"><span class="u">seg</span></span>
+              <span class="box"><input type="number" id="hd" min="1" max="15" placeholder="__" title="Quantos segundos o headline fica na tela"><span class="u">seg</span></span>
             </div>
+            <div class="hl-hint">Digite quantos segundos o headline deve aparecer no vídeo (de 1 a 15).</div>
           </div>
-          <div class="nota-sec">Escrito por cima do vídeo, com estilo diferente em cada variação.</div>
+          <div class="nota-sec">Escrita por cima do vídeo, variando as cores do texto e do fundo, para maior diferenciação.</div>
         </div>
 
         <!-- REMIX: estrutura detectada -->
@@ -466,10 +532,14 @@ button{font-family:inherit}
               <div class="combo-label">cópias únicas do seu vídeo</div>
             </div>
           </div>
-          <div class="combo-disc">Visualmente iguais, mas com assinatura distinta — arquivo, duração e enquadramento levemente diferentes, para não caírem como repetição.</div>
         </div>
       </div>
 
+      <!-- Duas coisas que valem em qualquer modo e a qualquer momento: quanto
+           tempo o arquivo dura, e por que ele não cai como repetição. A segunda
+           já era dita dentro do guia e no painel da direita — mas o guia abre
+           fechado e o painel só existe no modo único, então quem mais precisa
+           ler nunca lia. Aqui fica sempre à vista. -->
       <div class="rail-pe">
         <span class="rot">Seus vídeos ficam por 48 horas</span>
         <span class="nota">Depois disso são apagados do armazenamento. Baixe antes de fechar.</span>
@@ -482,7 +552,7 @@ button{font-family:inherit}
 
         <div class="palco-cab">
           <h1>Solte seus vídeos aqui</h1>
-          <span>Em minutos eles viram dezenas de arquivos prontos para postar.</span>
+          <span>Em minutos eles viram dezenas de arquivos prontos para postar, cada um único, para que a plataforma não leia como repetição.</span>
         </div>
 
         <!-- o balão -->
@@ -501,6 +571,11 @@ button{font-family:inherit}
           <div class="drop-fmt">mp4 · mov · até 1min30 cada</div>
           <div class="badge" id="badge">✦ <span id="fcount">0</span> arquivo(s)</div>
         </div>
+        <!-- A duração mora colada nos arquivos que acabaram de ser escolhidos.
+             No fim da coluna ela era desenhada fora do campo de visão em tela de
+             notebook, e o pior caso era o estouro: o GERAR travava e o motivo
+             ficava invisível. -->
+        <div class="dur-line" id="dur-line"></div>
 
         <!-- quantas variações -->
         <div class="caixa">
@@ -519,9 +594,8 @@ button{font-family:inherit}
           <div class="saldo-aviso" id="saldo-aviso"></div>
           <div class="gen-row">
             <button class="btn-gen" id="go" disabled>Gerar variações</button>
-            <button class="btn-ghost btn-clear-all" onclick="clearAll()" title="Limpa a seleção, os resultados e os arquivos no servidor">Limpar</button>
+            <button class="btn-ghost btn-clear-all" id="clearAllBtn" onclick="clearAll()" title="Limpa a seleção, os resultados e os arquivos no servidor">Limpar</button>
           </div>
-          <div class="dur-line" id="dur-line"></div>
         </div>
 
         <!-- progresso -->
@@ -550,6 +624,38 @@ button{font-family:inherit}
 </div>
 
 <!-- ══════════════════════════════════════════ planos ══ -->
+<!-- INDICAÇÃO — modal próprio, e não uma seção dentro do de planos.
+     São dois momentos diferentes: planos é "quero pagar", indicação é "quero
+     ganhar sem pagar". Misturar os dois faria a oferta gratuita parecer uma
+     tentativa de venda, que é a forma mais rápida de ninguém ler. -->
+<div class="modal-bg" id="refModal">
+  <div class="modal modal-estreito">
+    <div class="modal-topo">
+      <div>
+        <div class="modal-title">Indique e ganhe</div>
+        <div class="modal-sub" id="refSub">Seu link dá créditos pros dois lados.</div>
+      </div>
+      <button class="modal-x" onclick="fecharIndicacao()">✕</button>
+    </div>
+    <div class="modal-corpo">
+      <div class="ref-como" id="refComo"></div>
+
+      <div class="ref-link-row">
+        <div class="ref-link" id="refLink">—</div>
+        <button class="ref-copy" id="refCopy" onclick="copiarLink()">Copiar</button>
+      </div>
+
+      <div class="ref-placar">
+        <div class="ref-card"><div class="n" id="refEntraram">0</div><div class="l">entraram<br>pelo seu link</div></div>
+        <div class="ref-card"><div class="n" id="refAtivaram">0</div><div class="l">já geraram<br>vídeos</div></div>
+        <div class="ref-card"><div class="n" id="refPagaram">0</div><div class="l">viraram<br>assinantes</div></div>
+      </div>
+
+      <div class="ref-teto" id="refTeto"></div>
+    </div>
+  </div>
+</div>
+
 <div class="modal-bg" id="plansModal">
   <div class="modal">
     <div class="modal-topo">
@@ -660,11 +766,22 @@ function mostrarDuracao(segundos, contexto){
   const el=$('dur-line');
   if(segundos==null){ el.className='dur-line'; return true; }
   const limite=LIM.maxVideoSeconds, ok=segundos<=limite;
+  const saida = mode==='single'
+    ? 'Corte o vídeo antes de subir.'
+    : 'Corte um dos blocos ou grave takes mais curtos.';
   el.className='dur-line show '+(ok?'ok':'over');
   el.innerHTML = ok
     ? '✓ '+contexto+' <b>'+fmtDur(segundos)+'</b><span class="sub">dentro do limite de '+fmtDur(limite)+'</span>'
     : '⚠ '+contexto+' <b>'+fmtDur(segundos)+'</b><span class="sub">acima do limite de '+fmtDur(limite)+'. '
-      +(mode==='single'?'Corte o vídeo antes de subir.':'Corte um dos blocos ou grave takes mais curtos.')+'</span>';
+      +saida+'</span>';
+  // Estourar o limite DESABILITA o GERAR. Deixar o motivo só na linha acima já
+  // custou caro: quando ela ficava fora da tela, o resultado era um botão morto
+  // sem explicação, e a leitura óbvia é "a ferramenta quebrou". O aviso não
+  // some sozinho (ms=0) porque o bloqueio também não some até a pessoa agir.
+  if(!ok){
+    toast('Não dá pra gerar: seu vídeo tem '+fmtDur(segundos)+' e o limite é '
+          +fmtDur(limite)+'. '+saida, true, 0);
+  }
   return ok;
 }
 function limparDuracao(){ $('dur-line').className='dur-line'; $('dur-line').innerHTML=''; }
@@ -678,7 +795,84 @@ function toast(t,err,ms){
   if(ms!==0){ _toastTimer=setTimeout(()=>{ e.className='toast'; }, ms||4500); }
 }
 
+/* ── INDICAÇÃO ─────────────────────────────────────────────────────────────────
+   O código viaja em ?ref= no link. Ele é guardado no navegador porque entre
+   clicar no link e existir uma conta tem um cadastro e um e-mail de confirmação
+   no meio — a URL original já não existe quando a pessoa finalmente entra.
+
+   O vínculo é gravado UMA vez, no servidor. A chave some do navegador depois da
+   tentativa, dê certo ou não: insistir num código recusado só repetiria o erro
+   em toda visita.                                                             */
+const REF_CHAVE='varvid_ref';
+
+function guardarRefDaURL(){
+  try{
+    const c=new URLSearchParams(location.search).get('ref');
+    if(c) localStorage.setItem(REF_CHAVE, c.trim().toUpperCase());
+  }catch(e){}
+}
+
+async function resolverIndicacaoPendente(){
+  let codigo=null;
+  try{ codigo=localStorage.getItem(REF_CHAVE); }catch(e){}
+  if(!codigo) return;
+  try{ localStorage.removeItem(REF_CHAVE); }catch(e){}
+  try{
+    const d=await apiJson('/indicacao/registrar',{method:'POST',
+      headers:{'Content-Type':'application/json'}, body:JSON.stringify({codigo})});
+    if(d && d.ok){
+      toast('Bem-vindo! Você ganhou '+d.ganhou+' vídeo(s) por ter entrado por indicação.',false,7000);
+    }
+  }catch(e){ /* indicação não pode atrapalhar quem está entrando */ }
+}
+
+async function abrirIndicacao(){
+  $('refModal').classList.add('show');
+  try{
+    const d=await (await api('/indicacao')).json();
+    if(!d || !d.ativo) return;
+    const url=location.origin+'/login?ref='+d.codigo;
+    $('refLink').textContent=url;
+    $('refLink').dataset.url=url;
+    $('refComo').innerHTML=
+       passoRef(1,'Mande seu link pra quem cria vídeo.')
+      +passoRef(2,'Quem entrar por ele ganha <b>'+d.bonusIndicado+' vídeos</b> na hora.')
+      +passoRef(3,'Você ganha <b>'+d.bonusAtivacao+' vídeos</b> quando essa pessoa gerar pela primeira vez.')
+      +passoRef(4,'E mais <b>'+d.bonusPago+' vídeos</b> se ela assinar um plano.');
+    $('refEntraram').textContent=d.entraram;
+    $('refAtivaram').textContent=d.ativaram;
+    $('refPagaram').textContent=d.pagaram;
+    const cheio=d.ativaram>=d.teto;
+    $('refTeto').innerHTML = cheio
+      ? 'Você já usou as <b>'+d.teto+'</b> indicações que rendem crédito. Obrigado — seu link continua funcionando pra quem entrar.'
+      : 'Valem até <b>'+d.teto+'</b> indicações. Você usou '+d.ativaram+'.';
+  }catch(e){
+    $('refLink').textContent='não consegui carregar seu link agora';
+  }
+}
+function fecharIndicacao(){ $('refModal').classList.remove('show'); }
+function passoRef(n,txt){
+  return '<div class="ref-passo"><div class="ref-num">'+n+'</div><div>'+txt+'</div></div>';
+}
+async function copiarLink(){
+  const url=$('refLink').dataset.url;
+  if(!url) return;
+  const btn=$('refCopy');
+  try{
+    await navigator.clipboard.writeText(url);
+    btn.textContent='Copiado ✓';
+  }catch(e){
+    // clipboard exige contexto seguro e permissão; sem ele, selecionar o texto
+    // deixa a pessoa copiar na mão em vez de ficar sem saída.
+    const r=document.createRange(); r.selectNode($('refLink'));
+    const s=window.getSelection(); s.removeAllRanges(); s.addRange(r);
+    btn.textContent='Selecionado';
+  }
+  setTimeout(()=>{ btn.textContent='Copiar'; },2500);
+}
+
 async function boot(){
+  guardarRefDaURL();
   try{ cfg = await (await fetch('/auth-config.json')).json(); }catch(e){ cfg={authEnabled:false}; }
   if(cfg && cfg.limits) LIM = Object.assign(LIM, cfg.limits);
   // O prazo vem do servidor: mudou a regra do bucket, muda a variável e o texto
@@ -698,6 +892,10 @@ async function boot(){
     sb.auth.onAuthStateChange((_e, s)=>{ if(s && s.access_token) TOKEN = s.access_token; });
     $('userEmail').textContent = session.user.email || '';
     $('userWrap').style.display='flex';
+    // A indicação é resolvida ANTES de mostrar o saldo: quem entrou por um link
+    // precisa ver o crédito de boas-vindas já somado, não aparecer um segundo
+    // depois sem explicação.
+    await resolverIndicacaoPendente();
     refreshMe(); loadBilling();
   }
   wire();
@@ -705,6 +903,7 @@ async function boot(){
   $('gate').style.display='none';
   document.body.classList.add('ready');
   $('plansModal').addEventListener('click', e=>{ if(e.target.id==='plansModal') closePlans(); });
+  $('refModal').addEventListener('click', e=>{ if(e.target.id==='refModal') fecharIndicacao(); });
   const q=new URLSearchParams(location.search);
   if(q.get('assinatura')==='ok'){ toast('✓ Assinatura ativada! Seus créditos foram atualizados. (toque para fechar)', false, 0); setTimeout(refreshMe,800); }
   else if(q.get('assinatura')==='cancelada'){ toast('Assinatura cancelada — nada foi cobrado.'); }
@@ -834,6 +1033,10 @@ async function refreshMe(){
       pill.title = q ? ('Próxima recarga em '+q) : '';
     }
     else { pill.style.display='none'; }
+    // A indicação não depende do Stripe: o prêmio é crédito, não desconto. Ela
+    // aparece pra quem nunca vai abrir a tela de planos — que é justamente
+    // quem mais tem motivo pra buscar crédito de graça.
+    if(d.creditsEnabled) $('indicaBtn').style.display='inline-flex';
     avisoDeSaldo(d);
   }catch(e){}
 }
@@ -1215,9 +1418,35 @@ function startPolling(){
       }else if(!results.length){
         // terminou "com sucesso" e zero arquivos: takes irreconhecíveis
         toast('A geração terminou sem nenhum vídeo. Confira os nomes dos arquivos (Hook1, CTA1, Story…) e tente de novo.',true,0);
+      }else{
+        mostrarResultados();
       }
     }
   },1500);
+}
+
+/* Terminou: leva a pessoa até os vídeos.
+
+   Os resultados nascem abaixo da área de envio, então em tela de notebook eles
+   aparecem fora do campo de visão — a geração acaba e o que se vê é a mesma
+   tela de antes. Rolar até eles fecha o ciclo: começou no envio, termina na
+   entrega.
+
+   Só no fim de uma geração de verdade. Ao restaurar o último job na abertura da
+   página a tela fica quieta: saltar sozinha em quem acabou de chegar assusta
+   mais do que ajuda.
+
+   Quem pediu menos movimento no sistema recebe o salto seco, sem animação. */
+function mostrarResultados(){
+  const el=$('results');
+  if(!el || el.className.indexOf('show')===-1) return;
+  let suave=true;
+  try{ suave = !(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches); }catch(e){}
+  // Um respiro para a grade ser desenhada antes de medir onde ela está.
+  setTimeout(()=>{
+    try{ el.scrollIntoView({behavior: suave?'smooth':'auto', block:'start'}); }
+    catch(e){ try{ el.scrollIntoView(); }catch(_){} }
+  },140);
 }
 
 function renderResults(){
@@ -1273,7 +1502,36 @@ function clearSelection(){          // só a seleção local, não mexe no servi
   updateClearButtons();
 }
 
+/* ── ARMAR O LIMPAR ────────────────────────────────────────────────────────────
+   O Limpar apaga os vídeos já gerados — que já foram COBRADOS. Quem clicava
+   achando que estava só limpando a tela perdia o lote e pagava de novo pra
+   refazer: foi exatamente a queixa de "crédito cobrado em dobro" do QA.
+
+   Não usamos confirm() do navegador de propósito: ele bloqueia a página, some
+   atrás da barra no celular e não dá pra dizer quantos vídeos estão em jogo.
+   Em vez disso o próprio botão vira a pergunta, e o segundo clique confirma.
+
+   Só arma quando há vídeo gerado na tela. Sem resultado — geração travada, erro
+   sem entrega — o Limpar continua instantâneo: ele é a válvula de escape do
+   usuário e não pode ganhar um obstáculo justamente quando é mais necessário. */
+let _limparArmado=null;
+function desarmarLimpar(){
+  if(_limparArmado){ clearTimeout(_limparArmado); _limparArmado=null; }
+  const b=$('clearAllBtn');
+  if(b){ b.textContent='✕ Limpar'; b.classList.remove('armado'); }
+}
+function armarLimpar(){
+  const b=$('clearAllBtn');
+  if(b){ b.textContent='Apagar '+results.length+' vídeo(s)?'; b.classList.add('armado'); }
+  toast('Isso apaga os '+results.length+' vídeo(s) já gerados. Os créditos deles não voltam — baixe antes se ainda não baixou. Clique de novo pra confirmar.',true,8000);
+  // Desarma sozinho: um botão que ficou "armado" esquecido vira uma armadilha
+  // no próximo clique distraído.
+  _limparArmado=setTimeout(desarmarLimpar,8000);
+}
+
 async function clearAll(){          // seleção + resultados + arquivos no servidor
+  if(results.length && !_limparArmado){ armarLimpar(); return; }
+  desarmarLimpar();
   if(poll){ clearInterval(poll); poll=null; }
 
   // A limpeza do SERVIDOR é o que destrava uma nova geração. Antes o erro era
