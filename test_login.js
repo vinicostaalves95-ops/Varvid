@@ -23,7 +23,7 @@ function supabaseFalso(o) {
         onAuthStateChange(cb) { o.guardarCallback && o.guardarCallback(cb); },
         getSession: async () => ({ data: { session: o.session || null } }),
         signInWithPassword: async () => ({ error: o.erroLogin || null }),
-        signUp: async () => ({ data: { session: null }, error: null }),
+        signUp: async (dados) => { (o.cadastros = o.cadastros || []).push(dados); return { data: { session: null }, error: null }; },
         signInWithOAuth: async () => ({ error: null }),
         resetPasswordForEmail: async (email, opts) => {
           (o.enviados = o.enviados || []).push({ email, opts });
@@ -207,6 +207,33 @@ console.log('\n[7] Salvar a senha nova');
   b.els.password.value = 'senhanova123';
   await b.box.doSubmit();
   check('link já usado devolve pra pedir outro', b.tela() === 'reset', b.tela());
+}
+
+console.log('\n[8] Cadastro: repetir o e-mail');
+{
+  const cad = [];
+  const a = await montar({ sb: { cadastros: cad } });
+  a.box.irPara('signup');
+  check('campo de repetir e-mail aparece no cadastro', a.els.fieldEmail2.style.display === '', a.els.fieldEmail2.style.display);
+
+  a.els.email.value = 'ana@gmail.com'; a.els.email2.value = 'ana@gmial.com'; a.els.password.value = 'senha123';
+  await a.box.doSubmit();
+  check('e-mails diferentes: barra e NÃO chama o servidor', cad.length === 0 && /não são iguais/.test(a.els.msg.textContent), a.els.msg.textContent);
+
+  a.els.email2.value = '';
+  await a.box.doSubmit();
+  check('segundo campo vazio também barra', cad.length === 0);
+
+  a.els.email2.value = '  ANA@gmail.com ';
+  await a.box.doSubmit();
+  check('iguais (ignorando espaço e maiúscula): cadastra', cad.length === 1 && cad[0].email === 'ana@gmail.com', JSON.stringify(cad));
+  check('mensagem mostra para onde o link foi', /ana@gmail\.com/.test(a.els.msg.textContent), a.els.msg.textContent);
+
+  a.box.irPara('login');
+  check('some fora do cadastro e é limpo', a.els.fieldEmail2.style.display === 'none' && a.els.email2.value === '');
+  a.box.irPara('reset');
+  check('não aparece na recuperação de senha', a.els.fieldEmail2.style.display === 'none');
+  check('colar é bloqueado no HTML', /id="email2"[^>]*onpaste="return false"/.test(html));
 }
 
 console.log('\n' + ok + ' passaram · ' + fail + ' falharam');

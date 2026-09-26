@@ -26,6 +26,7 @@ import datetime
 import tempfile
 import subprocess
 import threading
+import contextlib
 from pathlib import Path
 from itertools import product as iterproduct
 
@@ -33,6 +34,11 @@ import time
 import urllib.request
 import urllib.error
 import urllib.parse
+
+try:
+    import fcntl                     # lock entre processos (macOS/Linux)
+except ImportError:                  # pragma: no cover — Windows: cai no lock de thread
+    fcntl = None
 
 from flask import Flask, request, jsonify, send_file, abort, redirect
 from werkzeug.utils import secure_filename
@@ -533,11 +539,31 @@ def cobrar_entregues(job_id, j):
     A marca `cobrado` no job é o que impede cobrar duas vezes, já que este ponto
     é alcançado tanto pelo aviso do Modal quanto pelo /status que o navegador
     consulta a cada segundo e meio.
+
+    A marca sozinha NÃO bastava: os dois caminhos chegam ao mesmo tempo, os dois
+    leem o job antes de qualquer um gravar a marca, e os dois cobram. Por isso o
+    trecho "conferir a marca → cobrar → gravar a marca" roda sob a trava do job,
+    e o job é RELIDO depois de entrar nela — o `j` que chegou pode ser anterior
+    à cobrança que o outro caminho acabou de fazer.
     """
     if not (CREDITS_ENABLED and j) or j.get('cobrado'):
         return j
     if j.get('status') not in ('done', 'error'):
         return j
+    with job_lock(job_id) as obtida:
+        if not obtida:
+            return j                # outro caminho está cobrando; a próxima consulta vê
+        fresco = load_job(job_id)
+        if fresco is not None and fresco is not j:
+            j.clear()
+            j.update(fresco)
+        if j.get('cobrado') or j.get('status') not in ('done', 'error'):
+            return j
+        return _cobrar_entregues_travado(job_id, j)
+
+
+def _cobrar_entregues_travado(job_id, j):
+    """O miolo da cobrança. Só chamar com a trava do job na mão."""
     uid = j.get('user_id')
     entregues = int(j.get('completed') or 0)
     if not uid:
@@ -1730,6 +1756,94 @@ def load_job(job_id):
         return None
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+#  TRAVA POR JOB
+#
+#  O fim de uma geração é anunciado por DOIS caminhos ao mesmo tempo: o Modal
+#  (PUT em /output/<job>/meta/_done) e o navegador (/status, a cada 1,5 s). Os
+#  dois acabam em cobrar_entregues(), e o gunicorn tem mais de um worker — então
+#  são processos diferentes, não threads que um lock de memória resolveria.
+#
+#  Sem trava, a sequência "ler o job → ver que não foi cobrado → cobrar → gravar
+#  a marca" tem uma fresta de vários round-trips ao Supabase. Dois caminhos que
+#  entrem nela cobram os dois, e pagam o bônus de indicação os dois: foi o que a
+#  planilha de QA relatou como "cobrado em dobro" e "indicou recebeu 10 em vez
+#  de 5". Medido antes da correção: 100 créditos viravam 91 em vez de 97.
+#
+#  A trava é um flock num arquivo por job, então vale entre processos. Quem chega
+#  depois ESPERA e, ao entrar, RELÊ o job do disco — é a releitura que faz ele
+#  ver a marca que o primeiro gravou. Trava sem releitura só serializa o erro.
+#
+#  É reentrante na mesma thread: o handler do Modal segura a trava do job inteiro
+#  e chama cobrar_entregues(), que pede a mesma.
+# ══════════════════════════════════════════════════════════════════════════════
+
+_JOB_LOCK_ESTADO = threading.local()
+JOB_LOCK_ESPERA = float(os.environ.get('VARVID_JOB_LOCK_ESPERA', '20'))
+
+
+@contextlib.contextmanager
+def job_lock(job_id, espera=None):
+    """Exclusão mútua por job. Devolve True se obteve a trava, False se estourou a espera.
+
+    Quem recebe False decide o que fazer: cobrar_entregues() desiste (a próxima
+    consulta tenta de novo — pior caso, a cobrança atrasa 1,5 s); o handler do
+    Modal segue sem trava, que é o comportamento de antes e não perde o aviso.
+    """
+    espera = JOB_LOCK_ESPERA if espera is None else espera
+    presas = getattr(_JOB_LOCK_ESTADO, 'presas', None)
+    if presas is None:
+        presas = _JOB_LOCK_ESTADO.presas = {}
+    if presas.get(job_id):                       # já é minha: reentra
+        presas[job_id] += 1
+        try:
+            yield True
+        finally:
+            presas[job_id] -= 1
+        return
+
+    fd = None
+    obtida = False
+    if fcntl is None:
+        yield True                               # sem flock: não há o que segurar
+        return
+    try:
+        os.makedirs(DATA_DIR, exist_ok=True)
+        fd = os.open(os.path.join(DATA_DIR, job_id + '.lock'), os.O_CREAT | os.O_RDWR)
+        limite = time.time() + espera
+        while True:
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                obtida = True
+                break
+            except (BlockingIOError, OSError):
+                if time.time() >= limite:
+                    print('[LOCK] espera estourada no job %s (%.0fs)' % (job_id, espera))
+                    break
+                time.sleep(0.02)
+    except Exception as e:
+        # Sistema de arquivos estranho: melhor rodar sem trava do que travar o app.
+        print('[LOCK] nao consegui travar o job %s: %s' % (job_id, e))
+        obtida = True
+    if obtida:
+        presas[job_id] = 1
+    try:
+        yield obtida
+    finally:
+        if obtida:
+            presas.pop(job_id, None)
+        if fd is not None:
+            try:
+                if fcntl is not None:
+                    fcntl.flock(fd, fcntl.LOCK_UN)
+            except Exception:
+                pass
+            try:
+                os.close(fd)
+            except Exception:
+                pass
+
+
 def _purge_job(jid):
     """Apaga o JSON, a pasta local e — se houver — os objetos no R2.
 
@@ -1737,10 +1851,11 @@ def _purge_job(jid):
     (botão Limpar, TTL): quem clicou não deve esperar dois dias para os vídeos
     saírem de lá.
     """
-    try:
-        os.remove(os.path.join(DATA_DIR, jid + '.json'))
-    except Exception:
-        pass
+    for ext in ('.json', '.lock'):
+        try:
+            os.remove(os.path.join(DATA_DIR, jid + ext))
+        except Exception:
+            pass
     shutil.rmtree(os.path.join(DATA_DIR, jid), ignore_errors=True)
     if R2_ENABLED:
         r2_apagar_job(jid)
@@ -2407,6 +2522,91 @@ def billing_webhook():
     return '', 200
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+#  /saude — o app está de pé E enxerga o banco?
+#
+#  Serve a dois usos:
+#    · um monitor externo (UptimeRobot) que avisa por e-mail quando isto deixa de
+#      responder 200 — o app fora, o Supabase pausado e o disco acabando caem
+#      todos aqui, e não passam despercebidos até um cliente reclamar;
+#    · uma consulta agendada (GitHub Actions) que mantém o projeto do Supabase
+#      ativo enquanto ele estiver no plano gratuito, que pausa por inatividade.
+#
+#  Decisões:
+#    · UMA consulta, sem retentativa e com prazo curto. O _sb_rest tenta três
+#      vezes com espera, e contra um banco pausado isso levaria quase um minuto —
+#      mais que o prazo de qualquer monitor, que então veria "demorou" em vez de
+#      "caiu". Aqui a resposta certa é rápida, mesmo que seja ruim.
+#    · Responde 503 quando algo está errado. Monitor e curl -f enxergam o código
+#      HTTP, não o texto; um 200 com "erro" no corpo passaria batido.
+#    · Não devolve mensagem de erro nem valor de disco: a rota é pública, e o
+#      detalhe fica no log do servidor, onde só o operador enxerga.
+#    · O resultado vale por SAUDE_CACHE_SEG. Sem isso, qualquer pessoa poderia
+#      transformar esta rota em milhares de consultas por minuto ao banco.
+# ══════════════════════════════════════════════════════════════════════════════
+
+SAUDE_CACHE_SEG = float(os.environ.get('VARVID_SAUDE_CACHE', '20'))
+SAUDE_PRAZO_BANCO = float(os.environ.get('VARVID_SAUDE_PRAZO_BANCO', '8'))
+SAUDE_DISCO_MIN_MB = float(os.environ.get('VARVID_SAUDE_DISCO_MIN_MB', '150'))
+_SAUDE_CACHE = {'quando': 0.0, 'resultado': None}
+
+
+def _sb_ping(prazo=None):
+    """Uma consulta mínima ao Supabase. Levanta exceção se não responder bem."""
+    chave = SUPABASE_SERVICE_KEY or SUPABASE_ANON_KEY
+    req = urllib.request.Request(
+        SUPABASE_URL.rstrip('/') + '/rest/v1/profiles?select=id&limit=1',
+        method='GET',
+        headers={'apikey': chave, 'Authorization': 'Bearer ' + chave})
+    with urllib.request.urlopen(req, timeout=prazo or SAUDE_PRAZO_BANCO) as resp:
+        resp.read()
+    return True
+
+
+def verificar_saude():
+    """(ok, partes). `partes` só tem palavras curtas — nada que vaze detalhe."""
+    ok = True
+    partes = {}
+    if AUTH_ENABLED:
+        try:
+            _sb_ping()
+            partes['banco'] = 'ok'
+        except Exception as e:
+            ok = False
+            partes['banco'] = 'falha'
+            print('[SAUDE] banco nao respondeu: %s' % e)
+    else:
+        partes['banco'] = 'desligado'          # modo local: não há banco a checar
+    try:
+        livre = free_space_mb()
+    except Exception as e:
+        livre = None
+        print('[SAUDE] nao consegui medir o disco: %s' % e)
+    if livre is not None and livre < SAUDE_DISCO_MIN_MB:
+        ok = False
+        partes['disco'] = 'baixo'
+        print('[SAUDE] disco baixo: %.0f MB livres (minimo %.0f)' % (livre, SAUDE_DISCO_MIN_MB))
+    else:
+        partes['disco'] = 'ok'
+    return ok, partes
+
+
+@app.route('/saude')
+def saude():
+    agora = time.time()
+    guardado = _SAUDE_CACHE['resultado']
+    if guardado is not None and agora - _SAUDE_CACHE['quando'] < SAUDE_CACHE_SEG:
+        ok, partes = guardado
+    else:
+        ok, partes = verificar_saude()
+        _SAUDE_CACHE['resultado'] = (ok, partes)
+        _SAUDE_CACHE['quando'] = agora
+    resp = jsonify(dict(partes, status='ok' if ok else 'degradado'))
+    resp.status_code = 200 if ok else 503
+    resp.headers['Cache-Control'] = 'no-store'
+    return resp
+
+
 @app.route('/admin/clear', methods=['POST'])
 def admin_clear():
     uid = current_user_id()
@@ -2535,8 +2735,16 @@ def generate():
 
     # Abre uma rodada NOVA: limpa inclusive as marcas de cobrança da anterior.
     # Sem isso, o selo antifraude da rodada passada isentava a rodada atual.
-    preparar_nova_rodada(job, count, headline_text, headline_duration)
-    save_job(job_id, job)
+    with job_lock(job_id):
+        # Relê: entre o _owned_job lá em cima e a trava, outro caminho pode ter
+        # cobrado ou gravado o job.
+        job = load_job(job_id) or job
+        # Fecha a conta da rodada anterior ANTES de abrir a próxima. Se ela
+        # terminou e ninguém cobrou ainda (aba fechada e o aviso do Modal ainda
+        # a caminho), apagar as marcas agora daria um vídeo de graça.
+        cobrar_entregues(job_id, job)
+        preparar_nova_rodada(job, count, headline_text, headline_duration)
+        save_job(job_id, job)
 
     if MODAL_ENABLED:
         dispatch_modal(job_id, count, headline_text, headline_duration, mode='remix')
@@ -2693,6 +2901,15 @@ def modal_output_meta(job_id, filename):
     # nome cru: é um único segmento da URL (sem barras); usado só p/ rotear a lógica,
     # não como caminho em disco. secure_filename() aqui removeria o '_' de '_done'.
     name = os.path.basename(filename)
+    # Segura a trava do job inteiro: ler, alterar, gravar E cobrar. Sem isso, este
+    # handler lia o job, o /status cobrava e gravava a marca, e o handler gravava
+    # a cópia velha por cima — a marca `cobrado` sumia e a consulta seguinte
+    # cobrava outra vez.
+    with job_lock(job_id):
+        return _aplicar_meta(job_id, name)
+
+
+def _aplicar_meta(job_id, name):
     j = load_job(job_id)
     if j is None:
         return 'not found', 404

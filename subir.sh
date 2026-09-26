@@ -53,7 +53,7 @@ fi
 echo ""
 echo "── testes ─────────────────────────────────────────"
 FALHOU=0
-for t in test_varvid.py test_bloqueio.py test_limites.py test_auth.py test_planos.py test_creditos.py test_indicacoes.py test_e2e.py test_r2.py; do
+for t in test_segredos.py test_varvid.py test_bloqueio.py test_limites.py test_auth.py test_planos.py test_creditos.py test_indicacoes.py test_concorrencia.py test_saude.py test_e2e.py test_r2.py; do
   [ -f "$t" ] || continue
   printf "  %-20s " "$t"
   if SAIDA=$(python3 "$t" 2>&1); then

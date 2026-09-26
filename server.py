@@ -4,9 +4,8 @@ import threading
 import shutil
 import json
 
-os.environ.setdefault('MODAL_TOKEN_ID', 'ak-NoYwGctnzXxAYNDyxOmgxG')
-os.environ.setdefault('MODAL_TOKEN_SECRET', 'as-2Ni7YID6KeVHVSeEQelpLi')
-
+# As credenciais do Modal NÃO ficam no código: este repositório é público.
+# Defina MODAL_TOKEN_ID e MODAL_TOKEN_SECRET no ambiente (no Render: Environment).
 import modal
 from flask import Flask, request, jsonify, send_file, abort
 from werkzeug.utils import secure_filename

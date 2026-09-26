@@ -143,6 +143,16 @@ gerando=false; mode='single';
   html=els.planGrid.innerHTML;
   check('plano atual não é vendido de novo', /Plano atual/.test(html));
 
+  console.log('\\n[7b] Rodapé do modal: "Gerenciar assinatura" só para quem assina');
+  // Oferecer o portal a quem nunca assinou leva a uma página vazia do Stripe.
+  // O botão agora é um bloco (flex), não mais um link inline dentro da frase.
+  PLANS_DATA.temAssinatura=true; openPlans();
+  check('assinante vê o botão de gerenciar', els.portalLink.style.display==='flex',
+        els.portalLink.style.display);
+  PLANS_DATA.temAssinatura=false; openPlans();
+  check('quem nunca assinou não vê o botão', els.portalLink.style.display==='none',
+        els.portalLink.style.display);
+
   console.log('\\n[8] Aviso de saldo: o anual precisa saber muito antes');
   avisoDeSaldo({creditsEnabled:true, acabando:false, credits:900, ciclo:'anual'});
   check('saldo confortável não incomoda ninguém',

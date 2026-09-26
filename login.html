@@ -99,6 +99,9 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-
         </button>
         <div class="divider" id="orDivider" style="display:none">ou com e-mail</div>
         <div class="field" id="fieldEmail"><label>E-mail</label><input type="email" id="email" placeholder="voce@email.com" autocomplete="email"></div>
+        <!-- Só no cadastro. Colar é bloqueado de propósito: o objetivo é a pessoa
+             digitar de novo, e um copiar-colar copiaria também o erro de digitação. -->
+        <div class="field" id="fieldEmail2" style="display:none"><label>Repita o e-mail</label><input type="email" id="email2" placeholder="voce@email.com" autocomplete="off" onpaste="return false" ondrop="return false"></div>
         <div class="field" id="fieldPassword"><label id="passwordLabel">Senha</label><input type="password" id="password" placeholder="••••••••" autocomplete="current-password"></div>
         <div class="forgot" id="forgotRow"><a id="forgotLink">Esqueci minha senha</a></div>
         <button class="submit" id="submitBtn">ENTRAR →</button>
@@ -106,11 +109,13 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-
         <div class="swap" id="backRow" style="display:none"><a id="backLink">← Voltar para o login</a></div>
       </div>
 
-      <!-- Antes esta frase pedia concordância com documentos que não existiam:
-           não havia link porque não havia página. Agora existem as duas. -->
+      <!-- LINKS-LEGAIS-OCULTOS (decisão de 25/09): a frase de concordância com Termos e
+           Privacidade fica escondida até os dados legais serem preenchidos. VOLTAR ANTES DA
+           PRIMEIRA COBRANÇA REAL (ver roadmap). Para religar, tire o comentário abaixo.
       <div class="terms">Ao continuar, você concorda com os
         <a href="/termos" target="_blank">Termos de Uso</a> e a
         <a href="/privacidade" target="_blank">Política de Privacidade</a>.</div>
+      -->
     </div>
   </div>
 </div>
@@ -241,13 +246,13 @@ function ligarEventos(){
    a mesma tela mostra só o que faz sentido em cada momento.                   */
 const TELAS = {
   login:     {titulo:'Entrar na sua conta',   sub:'Bem-vindo de volta — vamos criar.',
-              botao:'ENTRAR →',           email:true,  senha:true,  esqueci:true,  trocar:true,  voltar:false},
+              email2:false, botao:'ENTRAR →',           email:true,  senha:true,  esqueci:true,  trocar:true,  voltar:false},
   signup:    {titulo:'Criar sua conta',       sub:'Comece a gerar variações agora.',
-              botao:'CRIAR CONTA →',      email:true,  senha:true,  esqueci:false, trocar:true,  voltar:false},
+              email2:true, botao:'CRIAR CONTA →',      email:true,  senha:true,  esqueci:false, trocar:true,  voltar:false},
   reset:     {titulo:'Recuperar senha',       sub:'Diga seu e-mail que eu mando um link pra você criar uma senha nova.',
-              botao:'ENVIAR LINK →',      email:true,  senha:false, esqueci:false, trocar:false, voltar:true},
+              email2:false, botao:'ENVIAR LINK →',      email:true,  senha:false, esqueci:false, trocar:false, voltar:true},
   novaSenha: {titulo:'Criar uma senha nova',  sub:'Link confirmado. Escolha a senha que você vai usar de agora em diante.',
-              botao:'SALVAR SENHA →',     email:false, senha:true,  esqueci:false, trocar:false, voltar:false},
+              email2:false, botao:'SALVAR SENHA →',     email:false, senha:true,  esqueci:false, trocar:false, voltar:false},
 };
 
 function irPara(novo){
@@ -257,6 +262,8 @@ function irPara(novo){
   $('subtitle').textContent = t.sub;
   $('submitBtn').textContent= t.botao;
   ver('fieldEmail',    t.email);
+  ver('fieldEmail2',   t.email2);
+  if(!t.email2) $('email2').value='';
   ver('fieldPassword', t.senha);
   ver('forgotRow',     t.esqueci);
   ver('swap',          t.trocar);
@@ -280,6 +287,9 @@ async function doSubmit(){
 
   if(modo!=='novaSenha' && !email){ showMsg('Preencha seu e-mail.','err'); return; }
   if(modo!=='reset' && !password){ showMsg('Preencha a senha.','err'); return; }
+  if(modo==='signup' && $('email2').value.trim().toLowerCase() !== email.toLowerCase()){
+    showMsg('Os dois e-mails não são iguais. Confira e digite de novo: é para lá que vai o link de confirmação.','err'); return;
+  }
   if((modo==='signup'||modo==='novaSenha') && password.length<6){
     showMsg('A senha precisa ter pelo menos 6 caracteres.','err'); return;
   }
@@ -290,7 +300,7 @@ async function doSubmit(){
       const {data,error}=await sb.auth.signUp({email,password});
       if(error){showMsg(traduzir(error.message),'err');return;}
       if(data.session){ location.href='/'; }
-      else showMsg('Conta criada! Confira seu e-mail pra confirmar o cadastro.','ok');
+      else showMsg('Conta criada! Enviamos um link de confirmação para '+email+'. Confira a caixa de entrada e o spam.','ok');
 
     }else if(modo==='login'){
       const {error}=await sb.auth.signInWithPassword({email,password});
