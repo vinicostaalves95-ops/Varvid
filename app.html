@@ -220,6 +220,29 @@ body.ready{opacity:1}
 .toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:#1a1a1c;border:1px solid var(--border2);color:#eee;font-size:12.5px;padding:10px 16px;border-radius:10px;display:none;z-index:60;cursor:pointer;max-width:90vw}
 .toast.show{display:block}
 .toast.err{border-color:rgba(248,113,113,.4);color:#fca5a5}
+
+/* ── MOBILE ──────────────────────────────────────────────────────────────────
+   O layout foi desenhado como duas colunas fixas (340px + resto), pensado pra
+   desktop. Num celular isso sobra a coluna esquerda quase inteira e espreme a
+   direita a quase nada — foi o painel "Ajustes aplicados" flutuando/cortado
+   que apareceu no teste. A correção empilha as colunas (a esquerda já vem
+   primeiro no HTML) e deixa a página rolar inteira, em vez de duas caixas
+   internas de scroll de 340px cada. Nada de JS muda: setMode() continua
+   ligando/desligando os mesmos blocos por display:none/block, só que agora
+   empilhados verticalmente em vez de lado a lado. */
+@media (max-width: 860px){
+  html,body{height:auto}
+  .app{display:block;height:auto}
+  .left{border-right:none;border-bottom:2px solid #333;overflow-y:visible}
+  .right{overflow-y:visible}
+  .topbar{height:auto;min-height:52px;flex-wrap:wrap;padding:10px 16px;gap:8px 12px}
+  .user{gap:8px;flex-wrap:wrap}
+  .user .em{max-width:150px}
+  .ver{display:none}
+}
+@media (max-width: 480px){
+  .mx-grid{grid-template-columns:1fr}
+}
 </style></head>
 <body>
 <div class="gate" id="gate"><div class="sp"></div></div>
