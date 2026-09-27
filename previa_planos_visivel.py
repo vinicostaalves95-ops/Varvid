@@ -59,9 +59,8 @@ class StripeFalso:
     Price = PrecoFalso
 
 
-# Termos/Privacidade estão ocultos desde 25/09 (ver LINKS-LEGAIS-OCULTOS no app.html).
-# Ao religar os links, trocar para 2 — a guarda volta a exigir contraste e alcance.
-LINKS_LEGAIS = 0
+# Termos/Privacidade religados em 27/09 (ver histórico do app.html/login.html).
+LINKS_LEGAIS = 2
 
 MEDIR = """() => {
   const rgb = c => (c.match(/[\\d.]+/g) || []).slice(0, 3).map(Number);
